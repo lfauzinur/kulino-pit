@@ -5,16 +5,16 @@ import { Bike, KeyRound, Phone, X, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useI18n } from '@/lib/i18n';
 
-export default function MemberLogin() {
+export default function UnifiedLogin() {
   const { t } = useI18n();
-  const [wa, setWa] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   // Forgot Password State
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [resetWa, setResetWa] = useState('');
+  const [resetIdentifier, setResetIdentifier] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
@@ -23,9 +23,17 @@ export default function MemberLogin() {
     setLoading(true);
     // Simulate API call
     setTimeout(() => {
-      // Simulate successful login
-      localStorage.setItem('isMember', 'true');
-      router.push('/member');
+      const idStr = identifier.toLowerCase();
+      if (idStr === 'admin') {
+        localStorage.setItem('isAdmin', 'true');
+        router.push('/admin');
+      } else if (idStr === 'partner') {
+        localStorage.setItem('isPartner', 'true');
+        router.push('/partner');
+      } else {
+        localStorage.setItem('isMember', 'true');
+        router.push('/member');
+      }
     }, 1000);
   };
 
@@ -52,9 +60,9 @@ export default function MemberLogin() {
         <Link href="/" className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--color-primary)] text-white mb-4 shadow-lg">
           <Bike size={32} />
         </Link>
-        <h2 className="text-3xl font-display font-black text-gray-900">{t('auth.loginTitle')}</h2>
+        <h2 className="text-3xl font-display font-black text-gray-900">Portal Masuk</h2>
         <p className="mt-2 text-sm text-gray-600">
-          {t('auth.loginSubtitle')}
+          Masuk ke Dashboard Member, Mitra Partner, atau Super Admin.
         </p>
       </div>
 
@@ -63,17 +71,17 @@ export default function MemberLogin() {
           <form className="space-y-6" onSubmit={handleLogin}>
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                {t('auth.whatsapp')}
+                No WhatsApp / Username / Email
               </label>
               <div className="mt-1 relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
-                  type="tel"
+                  type="text"
                   required
                   className="clean-input pl-10"
-                  placeholder="081234567890"
-                  value={wa}
-                  onChange={(e) => setWa(e.target.value)}
+                  placeholder="0812... / Budi / admin"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                 />
               </div>
             </div>
@@ -160,7 +168,7 @@ export default function MemberLogin() {
               onClick={() => {
                 setShowForgotModal(false);
                 setResetSuccess(false);
-                setResetWa('');
+                setResetIdentifier('');
               }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
             >
@@ -176,7 +184,7 @@ export default function MemberLogin() {
                   {t('auth.linkSent')}
                 </h3>
                 <p className="text-sm text-gray-500 mb-6">
-                  {t('auth.linkSentDesc1')}<strong>{resetWa}</strong>{t('auth.linkSentDesc2')}
+                  {t('auth.linkSentDesc1')}<strong>{resetIdentifier}</strong>{t('auth.linkSentDesc2')}
                 </p>
                 <button 
                   onClick={() => {
@@ -202,17 +210,17 @@ export default function MemberLogin() {
                 <form onSubmit={handleResetPassword} className="space-y-4">
                   <div>
                     <input
-                      type="tel"
+                      type="text"
                       required
-                      placeholder="081234567890"
-                      value={resetWa}
-                      onChange={(e) => setResetWa(e.target.value)}
+                      placeholder="No WA / Username / Email"
+                      value={resetIdentifier}
+                      onChange={(e) => setResetIdentifier(e.target.value)}
                       className="clean-input"
                     />
                   </div>
                   <button 
                     type="submit" 
-                    disabled={resetLoading || !resetWa}
+                    disabled={resetLoading || !resetIdentifier}
                     className="btn btn-primary w-full py-3"
                   >
                     {resetLoading ? t('auth.sending') : t('auth.sendReset')}

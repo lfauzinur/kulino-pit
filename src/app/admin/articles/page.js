@@ -1,250 +1,335 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, FileText, Eye, Save, X, Clock, Tag, Image as ImageIcon } from 'lucide-react';
-import { articles as initialArticles } from '@/lib/data';
+import { useState } from 'react';
+import { 
+  ChevronDown, Eye, Type, Image as ImageIcon, 
+  Bold, Italic, List, Grid, Link as LinkIcon, Code,
+  Trash2, ArrowDown, ArrowUp, Move, Plus, Calendar, Clock,
+  Check, X
+} from 'lucide-react';
 
 export default function AdminArticlesPage() {
-  const [articlesList, setArticlesList] = useState(initialArticles);
-  const [editingArticle, setEditingArticle] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    title: { id: '', en: '' },
-    excerpt: { id: '', en: '' },
-    category: { id: '', en: '' },
-    date: new Date().toISOString().split('T')[0],
-    image: '/images/hero-banner.png',
-    status: 'draft',
-  });
+  const [title, setTitle] = useState('Making The World a Better Place');
+  const [activeTab, setActiveTab] = useState('Content');
+  const [publishedGlobally, setPublishedGlobally] = useState(true);
+  const [publishedEnglish, setPublishedEnglish] = useState(true);
+  
+  const [metaForm, setMetaForm] = useState({ metaTitle: '', metaDescription: '', keywords: '' });
+  const [seoForm, setSeoForm] = useState({ slug: '', canonical: '', ogImage: '' });
 
-  const handleEdit = (article) => {
-    setEditingArticle(article.id);
-    setForm({
-      title: { ...article.title },
-      excerpt: { ...article.excerpt },
-      category: { ...article.category },
-      date: article.date,
-      image: article.image,
-      status: article.status || 'published',
-    });
-    setShowForm(true);
-  };
-
-  const handleNew = () => {
-    setEditingArticle(null);
-    setForm({
-      title: { id: '', en: '' },
-      excerpt: { id: '', en: '' },
-      category: { id: '', en: '' },
-      date: new Date().toISOString().split('T')[0],
-      image: '/images/hero-banner.png',
-      status: 'draft',
-    });
-    setShowForm(true);
-  };
+  const [blocks, setBlocks] = useState([
+    { 
+      id: 1, 
+      type: 'text', 
+      title: 'Making The World a Better Place', 
+      content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quis ipsum amet turpis nibh ipsum parturient donec. Ultrices porttitor nullam volutpat et in. Vitae quis tortor a odio tincidunt.' 
+    },
+    { 
+      id: 2, 
+      type: 'image', 
+      caption: '' 
+    }
+  ]);
 
   const handleSave = () => {
-    if (editingArticle) {
-      setArticlesList(prev => prev.map(a =>
-        a.id === editingArticle ? { ...a, ...form } : a
-      ));
-    } else {
-      setArticlesList(prev => [
-        ...prev,
-        { id: Date.now(), ...form },
-      ]);
+    try {
+      const newArticle = {
+        id: 'custom-' + Date.now(),
+        title: { id: title, en: title },
+        excerpt: { 
+          id: blocks.find(b => b.type === 'text')?.content || 'No excerpt available.', 
+          en: blocks.find(b => b.type === 'text')?.content || 'No excerpt available.' 
+        },
+        date: new Date().toISOString().split('T')[0],
+        category: { id: metaForm.keywords || 'Berita', en: metaForm.keywords || 'News' },
+        image: '/images/bikes/roadbike.png' // Default placeholder image
+      };
+      
+      const existing = JSON.parse(localStorage.getItem('customArticles') || '[]');
+      localStorage.setItem('customArticles', JSON.stringify([newArticle, ...existing]));
+      alert('Article published successfully! Check the main Articles page.');
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save article.');
     }
-    setShowForm(false);
-    setEditingArticle(null);
   };
 
-  const handleDelete = (id) => {
-    if (confirm('Yakin ingin menghapus artikel ini?')) {
-      setArticlesList(prev => prev.filter(a => a.id !== id));
-    }
+  const updateBlock = (id, field, val) => {
+    setBlocks(prev => prev.map(b => b.id === id ? { ...b, [field]: val } : b));
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-display font-black text-3xl text-gray-900 flex items-center gap-3">
-            <FileText size={28} className="text-[var(--color-primary)]" /> Articles Management
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola konten artikel dan blog untuk halaman /artikel.</p>
-        </div>
-        <button onClick={handleNew} className="btn btn-primary px-5 py-2.5 text-sm flex items-center gap-2">
-          <Plus size={16} /> Tulis Artikel Baru
-        </button>
-      </header>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="clean-card p-4 flex items-center gap-3 hover:translate-y-0">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><FileText size={20} /></div>
-          <div>
-            <p className="font-display font-black text-xl text-gray-900">{articlesList.length}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Total Artikel</p>
-          </div>
-        </div>
-        <div className="clean-card p-4 flex items-center gap-3 hover:translate-y-0">
-          <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center"><Eye size={20} /></div>
-          <div>
-            <p className="font-display font-black text-xl text-gray-900">{articlesList.filter(a => (a.status || 'published') === 'published').length}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Published</p>
-          </div>
-        </div>
-        <div className="clean-card p-4 flex items-center gap-3 hover:translate-y-0">
-          <div className="w-10 h-10 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center"><Edit2 size={20} /></div>
-          <div>
-            <p className="font-display font-black text-xl text-gray-900">{articlesList.filter(a => a.status === 'draft').length}</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Draft</p>
+    <div className="bg-gray-50 min-h-[calc(100vh-4rem)] p-4 sm:p-6 font-sans">
+      {/* Top Bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <input 
+          type="text" 
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="flex-1 w-full sm:max-w-2xl px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+          placeholder="Article Title..."
+        />
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => alert('Change language')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
+            English <ChevronDown size={16} />
+          </button>
+          <button type="button" onClick={() => alert('Preview mode')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
+            <Eye size={16} /> Preview
+          </button>
+          <div className="flex">
+            <button type="button" onClick={handleSave} className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-l-lg hover:bg-blue-700 shadow-sm">
+              Save
+            </button>
+            <button type="button" onClick={() => alert('More options')} className="px-2 py-2 bg-blue-600 border-l border-blue-700 text-white rounded-r-lg hover:bg-blue-700 shadow-sm">
+              <ChevronDown size={16} />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Article Form Modal */}
-      {showForm && (
-        <div className="clean-card p-6 border-2 border-[var(--color-primary)] hover:translate-y-0">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display font-bold text-lg text-gray-900">
-              {editingArticle ? 'Edit Artikel' : 'Tulis Artikel Baru'}
-            </h2>
-            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <X size={16} />
-            </button>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Editor Area */}
+        <div className="flex-1">
+          {/* Tabs */}
+          <div className="flex gap-1 mb-4 bg-white border border-gray-200 rounded-t-xl overflow-hidden p-1">
+            {['Content', 'Meta', 'SEO'].map(tab => (
+              <button 
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                  activeTab === tab ? 'bg-gray-50 text-blue-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Judul (ID)</label>
-              <input
-                type="text"
-                className="clean-input"
-                value={form.title.id}
-                onChange={e => setForm(p => ({ ...p, title: { ...p.title, id: e.target.value } }))}
-                placeholder="Judul artikel dalam Bahasa Indonesia..."
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Title (EN)</label>
-              <input
-                type="text"
-                className="clean-input"
-                value={form.title.en}
-                onChange={e => setForm(p => ({ ...p, title: { ...p.title, en: e.target.value } }))}
-                placeholder="Article title in English..."
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Ringkasan (ID)</label>
-              <textarea
-                className="clean-input min-h-[80px]"
-                value={form.excerpt.id}
-                onChange={e => setForm(p => ({ ...p, excerpt: { ...p.excerpt, id: e.target.value } }))}
-                placeholder="Ringkasan artikel..."
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Excerpt (EN)</label>
-              <textarea
-                className="clean-input min-h-[80px]"
-                value={form.excerpt.en}
-                onChange={e => setForm(p => ({ ...p, excerpt: { ...p.excerpt, en: e.target.value } }))}
-                placeholder="Article excerpt..."
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Kategori (ID)</label>
-              <input
-                type="text"
-                className="clean-input"
-                value={form.category.id}
-                onChange={e => setForm(p => ({ ...p, category: { ...p.category, id: e.target.value } }))}
-                placeholder="e.g. Tips & Trik"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Category (EN)</label>
-              <input
-                type="text"
-                className="clean-input"
-                value={form.category.en}
-                onChange={e => setForm(p => ({ ...p, category: { ...p.category, en: e.target.value } }))}
-                placeholder="e.g. Tips & Tricks"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Tanggal</label>
-              <input
-                type="date"
-                className="clean-input"
-                value={form.date}
-                onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5">Status</label>
-              <div className="flex gap-2">
-                {['draft', 'published'].map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setForm(p => ({ ...p, status: s }))}
-                    className={`btn flex-1 py-2.5 text-xs ${form.status === s ? 'btn-primary' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-                  >
-                    {s === 'draft' ? '📝 Draft' : '✅ Published'}
-                  </button>
+          <div className="bg-white border border-gray-200 border-t-0 p-6 rounded-b-xl shadow-sm min-h-[600px]">
+            {activeTab === 'Content' && (
+              <div className="space-y-6">
+                {blocks.map((block, index) => (
+                  <div key={block.id} className="border border-gray-100 rounded-xl bg-gray-50/30 overflow-hidden group">
+                    {/* Block Header */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white">
+                      <div className="flex items-center gap-2 text-blue-600 font-medium text-sm">
+                        <ChevronDown size={16} />
+                        {block.type === 'text' ? 'Text' : 'Image'}
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button type="button" className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded"><Trash2 size={14} /></button>
+                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded"><ArrowDown size={14} /></button>
+                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded"><ArrowUp size={14} /></button>
+                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded cursor-move"><Move size={14} /></button>
+                      </div>
+                    </div>
+
+                    {/* Block Content */}
+                    <div className="p-4 bg-white">
+                      {block.type === 'text' && (
+                        <div>
+                          {/* Toolbar */}
+                          <div className="flex items-center gap-1 mb-4 border border-gray-200 rounded-lg p-1 w-max">
+                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Type size={16} /></button>
+                            <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Bold size={16} /></button>
+                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Italic size={16} /></button>
+                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><List size={16} /></button>
+                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Grid size={16} /></button>
+                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><LinkIcon size={16} /></button>
+                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Code size={16} /></button>
+                          </div>
+                          
+                          <input 
+                            type="text" 
+                            value={block.title || ''} 
+                            onChange={(e) => updateBlock(block.id, 'title', e.target.value)}
+                            className="w-full font-bold text-xl text-gray-800 mb-3 focus:outline-none"
+                            placeholder="Heading..."
+                          />
+                          <textarea 
+                            className="w-full text-gray-600 focus:outline-none resize-none min-h-[100px]"
+                            value={block.content || ''}
+                            onChange={(e) => updateBlock(block.id, 'content', e.target.value)}
+                            placeholder="Start typing..."
+                          />
+                        </div>
+                      )}
+
+                      {block.type === 'image' && (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium text-gray-600 w-24">Upload image*</span>
+                            <div className="flex-1 border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center justify-center gap-2 text-blue-600 bg-blue-50/30 cursor-pointer hover:bg-blue-50">
+                              <ImageIcon size={20} />
+                              <span className="text-sm font-medium">Upload a file or drag and drop</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium text-gray-600 w-24">Caption</span>
+                            <input 
+                              type="text" 
+                              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+                              value={block.caption || ''}
+                              onChange={(e) => updateBlock(block.id, 'caption', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ))}
+
+                <button type="button" onClick={() => alert('Add new block feature')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm mt-4">
+                  <Plus size={16} /> Add block
+                </button>
+              </div>
+            )}
+            
+            {activeTab === 'Meta' && (
+              <div className="space-y-6 animate-fade-in max-w-2xl">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Meta Title</label>
+                  <input 
+                    type="text" 
+                    value={metaForm.metaTitle}
+                    onChange={(e) => setMetaForm({...metaForm, metaTitle: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+                    placeholder="Enter meta title..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Meta Description</label>
+                  <textarea 
+                    value={metaForm.metaDescription}
+                    onChange={(e) => setMetaForm({...metaForm, metaDescription: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 h-24 resize-none"
+                    placeholder="Enter meta description..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Keywords</label>
+                  <input 
+                    type="text" 
+                    value={metaForm.keywords}
+                    onChange={(e) => setMetaForm({...metaForm, keywords: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+                    placeholder="e.g. blog, travel, updates"
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'SEO' && (
+              <div className="space-y-6 animate-fade-in max-w-2xl">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">URL Slug</label>
+                  <input 
+                    type="text" 
+                    value={seoForm.slug}
+                    onChange={(e) => setSeoForm({...seoForm, slug: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+                    placeholder="e.g. making-the-world-a-better-place"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Canonical URL</label>
+                  <input 
+                    type="text" 
+                    value={seoForm.canonical}
+                    onChange={(e) => setSeoForm({...seoForm, canonical: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
+                    placeholder="https://"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Sidebar */}
+        <div className="w-full lg:w-80 space-y-6">
+          {/* Author */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Author</label>
+            <div className="relative">
+              <div className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg flex items-center justify-between cursor-pointer shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-gray-200 overflow-hidden">
+                    {/* Placeholder Avatar */}
+                    <div className="w-full h-full bg-blue-900 flex items-center justify-center text-white text-xs font-bold">DC</div>
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">David Clarke</span>
+                </div>
+                <ChevronDown size={16} className="text-gray-400" />
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2 mt-6">
-            <button onClick={handleSave} className="btn btn-primary px-6 py-2.5 text-sm flex items-center gap-2">
-              <Save size={14} /> Simpan
-            </button>
-            <button onClick={() => setShowForm(false)} className="btn bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 px-6 py-2.5 text-sm">
-              Batal
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Articles List */}
-      <div className="clean-card overflow-hidden hover:translate-y-0">
-        <div className="p-4 bg-gray-50 border-b border-gray-100">
-          <h2 className="font-display font-bold text-sm text-gray-900">Daftar Artikel</h2>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {articlesList.map(article => (
-            <div key={article.id} className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-              <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 overflow-hidden relative">
-                <div className="w-full h-full flex items-center justify-center">
-                  <ImageIcon size={24} className="text-gray-300" />
-                </div>
+          {/* Post Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Post date</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input type="text" value="02/12/2019" className="w-full px-3 py-2 pl-3 pr-8 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 shadow-sm focus:outline-none" readOnly />
+                <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
               </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-bold text-gray-900 truncate">{article.title.id}</h4>
-                <p className="text-[10px] text-gray-500 truncate mt-0.5">{article.excerpt.id}</p>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <span className="text-[9px] text-gray-400 flex items-center gap-1"><Clock size={9} /> {article.date}</span>
-                  <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-50 text-blue-600 flex items-center gap-1">
-                    <Tag size={8} /> {article.category.id}
-                  </span>
-                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${(article.status || 'published') === 'published' ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}`}>
-                    {(article.status || 'published') === 'published' ? '✅ Published' : '📝 Draft'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={() => handleEdit(article)} className="p-2 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors" title="Edit">
-                  <Edit2 size={14} />
-                </button>
-                <button onClick={() => handleDelete(article.id)} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors" title="Hapus">
-                  <Trash2 size={14} />
-                </button>
+              <div className="relative w-28">
+                <input type="text" value="16:00" className="w-full px-3 py-2 pl-3 pr-8 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 shadow-sm focus:outline-none" readOnly />
+                <Clock size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
               </div>
             </div>
-          ))}
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Category</label>
+            <div className="w-full p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
+                Big Data <button type="button" onClick={() => alert('Remove tag')} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
+              </span>
+              <button type="button" onClick={() => alert('Add tag')} className="ml-auto p-1 text-gray-400 hover:text-blue-500">
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Tag */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Tag</label>
+            <div className="w-full p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm flex items-center gap-2 flex-wrap">
+              <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
+                Big Data <button type="button" onClick={() => alert('Remove tag')} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
+              </span>
+              <button type="button" onClick={() => alert('Add tag')} className="ml-auto p-1 text-gray-400 hover:text-blue-500">
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Toggles */}
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Published globally</span>
+              <button 
+                type="button"
+                onClick={() => setPublishedGlobally(!publishedGlobally)}
+                className={`w-10 h-6 rounded-full flex items-center px-1 transition-colors ${publishedGlobally ? 'bg-green-400' : 'bg-gray-300'}`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${publishedGlobally ? 'translate-x-4' : 'translate-x-0'}`}></div>
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Published in English</span>
+              <button 
+                type="button"
+                onClick={() => setPublishedEnglish(!publishedEnglish)}
+                className={`w-10 h-6 rounded-full flex items-center px-1 transition-colors ${publishedEnglish ? 'bg-green-400' : 'bg-gray-300'}`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${publishedEnglish ? 'translate-x-4' : 'translate-x-0'}`}></div>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

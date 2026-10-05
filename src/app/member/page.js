@@ -7,12 +7,88 @@ import {
   LayoutDashboard, MapPin, CalendarDays, Award, Link as LinkIcon, 
   Trophy, Bike, DollarSign, Star, CheckCircle, Clock, Info, 
   Map as MapIcon, MousePointerClick, Users, CreditCard, LogOut,
-  Share2, Link2, RotateCcw, Gift
+  Share2, Link2, RotateCcw, Gift, AlertTriangle
 } from 'lucide-react';
+
+/* ─── Active Booking Timer Component ─── */
+function ActiveBookingTimer({ booking, locale, t }) {
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  useEffect(() => {
+    if (booking.status !== 'active' || !booking.activeSince || !booking.durationMinutes) return;
+
+    const calculateTimeLeft = () => {
+      const endTime = booking.activeSince + (booking.durationMinutes * 60 * 1000);
+      const now = Date.now();
+      const diff = endTime - now;
+      return diff;
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
+    const interval = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [booking]);
+
+  if (booking.status !== 'active' || timeLeft === null) return null;
+
+  const isExpired = timeLeft <= 0;
+  const isWarning = !isExpired && timeLeft <= 10 * 60 * 1000;
+
+  const formatTime = (ms) => {
+    if (ms <= 0) return '00:00:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className={`clean-card p-4 mb-6 border ${isExpired ? 'bg-red-50 border-red-200' : isWarning ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'} flex items-center justify-between gap-4 flex-wrap`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isExpired ? 'bg-red-100 text-red-500' : isWarning ? 'bg-amber-100 text-amber-500' : 'bg-blue-100 text-blue-500'}`}>
+          {isWarning || isExpired ? <AlertTriangle size={24} /> : <Clock size={24} />}
+        </div>
+        <div>
+          <h3 className={`font-display font-black text-sm ${isExpired ? 'text-red-700' : isWarning ? 'text-amber-700' : 'text-blue-700'}`}>
+            {isExpired ? (locale === 'id' ? 'Waktu Sewa Habis!' : 'Rental Time Expired!') : (locale === 'id' ? 'Sepeda Sedang Disewa' : 'Bike is Currently Rented')}
+          </h3>
+          <p className="text-xs text-gray-600 mt-1">
+            {booking.bike} • {booking.id}
+          </p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">{locale === 'id' ? 'Sisa Waktu' : 'Time Left'}</p>
+        <p className={`font-display font-black text-3xl tabular-nums ${isExpired ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-blue-600'}`}>
+          {formatTime(timeLeft)}
+        </p>
+        {isWarning && (
+          <p className="text-[10px] font-bold text-amber-600 mt-1 animate-pulse">
+            {locale === 'id' ? '⚠️ Kurang dari 10 menit lagi' : '⚠️ Less than 10 mins remaining'}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ─── Dashboard Tab ─── */
 function DashboardTab({ t, locale }) {
   const d = memberData;
+  const [history, setHistory] = useState(d.bookingHistory);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('memberBookings');
+    if (saved) {
+      setHistory([...JSON.parse(saved), ...d.bookingHistory]);
+    }
+  }, []);
+
   return (
     <div>
       {/* Welcome */}
@@ -28,6 +104,11 @@ function DashboardTab({ t, locale }) {
           </div>
         </div>
       </div>
+
+      {/* Active Bookings Warning */}
+      {history.filter(b => b.status === 'active').map(booking => (
+        <ActiveBookingTimer key={booking.id} booking={booking} locale={locale} t={t} />
+      ))}
 
       {/* Stats Grid */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
@@ -53,7 +134,7 @@ function DashboardTab({ t, locale }) {
           <h3 className="font-display font-black text-sm text-gray-900">{t('member.history')}</h3>
         </div>
         <div className="divide-y divide-gray-100">
-          {d.bookingHistory.map(b => (
+          {history.map(b => (
             <div key={b.id} className="p-4 flex items-center justify-between gap-4 flex-wrap hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-gray-100 text-[var(--color-primary)] flex items-center justify-center shrink-0">
@@ -65,9 +146,9 @@ function DashboardTab({ t, locale }) {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`px-2 py-1 rounded-full text-[9px] font-bold flex items-center gap-1 ${b.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                <span className={`px-2 py-1 rounded-full text-[9px] font-bold flex items-center gap-1 ${b.status === 'completed' ? 'bg-green-50 text-green-600' : b.status === 'active' ? 'bg-amber-50 text-amber-600 animate-pulse' : 'bg-blue-50 text-blue-600'}`}>
                   {b.status === 'completed' ? <CheckCircle size={10} /> : <Clock size={10} />}
-                  {b.status === 'completed' ? 'Completed' : 'Upcoming'}
+                  {b.status === 'completed' ? 'Completed' : b.status === 'active' ? 'Active' : 'Upcoming'}
                 </span>
                 <p className="font-display font-bold text-sm text-gray-900">{formatCurrency(b.total)}</p>
                 {b.points > 0 && <span className="px-2 py-1 rounded-full bg-yellow-50 text-yellow-600 text-[9px] font-bold">+{b.points} pts</span>}
@@ -259,9 +340,26 @@ function RideTrackerTab({ t, locale }) {
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
       Math.sin(dLon / 2) * Math.sin(dLon / 2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
-    return R * c; // Distance in km
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
+
+  // Calculate Average Speed (km/h) based on distance and time
+  const avgSpeed = time > 0 ? (distance / (time / 3600)).toFixed(1) : '0.0';
+
+  // Calculate Calories Burned (kcal)
+  // Precise estimation for cycling: approx 30-35 kcal per km depending on speed.
+  // Using a dynamic factor based on average speed for higher precision.
+  const calculateCalories = () => {
+    let speedKmh = parseFloat(avgSpeed);
+    let kcalPerKm = 30; // base for very slow
+    if (speedKmh > 20) kcalPerKm = 40;
+    else if (speedKmh > 15) kcalPerKm = 35;
+    
+    return Math.floor(distance * kcalPerKm);
+  };
+  
+  const caloriesBurned = calculateCalories();
 
   const handleToggleTrack = () => {
     if (isTracking) {
@@ -285,7 +383,7 @@ function RideTrackerTab({ t, locale }) {
         watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
             setGpsStatus('SIGNAL ACQUIRED');
-            const { latitude, longitude, speed: gpsSpeed } = position.coords;
+            const { latitude, longitude } = position.coords;
             
             // Calculate distance if we have a previous point
             if (lastCoordsRef.current) {
@@ -295,7 +393,7 @@ function RideTrackerTab({ t, locale }) {
                 latitude,
                 longitude
               );
-              // Only add if it's a significant move (>2 meters) to avoid GPS jitter
+              // Filter out GPS jitter (moves under 2 meters)
               if (dist > 0.002) {
                 setDistance(prev => prev + dist);
               }
@@ -303,13 +401,6 @@ function RideTrackerTab({ t, locale }) {
             
             lastCoordsRef.current = { latitude, longitude };
             setLocation({ lat: latitude, lng: longitude });
-            
-            // Speed is in m/s, convert to km/h. If null, calculate manually (omitted for brevity, assume 0 if null)
-            if (gpsSpeed !== null) {
-              setSpeed((gpsSpeed * 3.6).toFixed(1));
-            } else {
-              setSpeed(0);
-            }
           },
           (error) => {
             console.error(error);
@@ -338,7 +429,7 @@ function RideTrackerTab({ t, locale }) {
     return `${h}:${m}:${s}`;
   };
 
-  const shareText = `🚴 Ride completed with Kulino Pit!\n⏱ ${formatTime(time)}\n📏 ${distance.toFixed(2)} km\n🔥 ${Math.floor(distance * 35)} kcal\n\n#KulinoPit #GowesanBanyuwangi`;
+  const shareText = `🚴 Ride completed with Kulino Pit!\n⏱ ${formatTime(time)}\n📏 ${distance.toFixed(2)} km\n⚡ ${avgSpeed} km/h\n🔥 ${caloriesBurned} kcal\n\n#KulinoPit #GowesanBanyuwangi`;
   const shareUrl = 'https://kulinopit.id';
 
   const shareActions = [
@@ -431,11 +522,11 @@ function RideTrackerTab({ t, locale }) {
             </div>
             <div className="p-4 rounded-2xl bg-gray-50 text-center border border-gray-100">
               <p className="text-[9px] font-bold uppercase text-gray-500 mb-1">{t('member.avgSpeed')}</p>
-              <p className="font-display font-black text-2xl text-gray-900">{speed}<span className="text-xs text-gray-400">km/h</span></p>
+              <p className="font-display font-black text-2xl text-gray-900">{avgSpeed}<span className="text-xs text-gray-400">km/h</span></p>
             </div>
             <div className="p-4 rounded-2xl bg-gray-50 text-center border border-gray-100">
               <p className="text-[9px] font-bold uppercase text-gray-500 mb-1">{t('member.calories')}</p>
-              <p className="font-display font-black text-2xl text-gray-900">{Math.floor(distance * 35)}<span className="text-xs text-gray-400">kcal</span></p>
+              <p className="font-display font-black text-2xl text-gray-900">{caloriesBurned}<span className="text-xs text-gray-400">kcal</span></p>
             </div>
           </div>
 

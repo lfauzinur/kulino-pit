@@ -1,4 +1,5 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Calendar, User, Share2, Link2, MessageCircle } from 'lucide-react';
@@ -7,8 +8,28 @@ import { useI18n } from '@/lib/i18n';
 
 export default function ArticleDetail({ params }) {
   const { locale } = useI18n();
-  // We'll simulate fetching the article based on the slug.
-  const article = articles.find(a => a.id.toString() === params.slug) || articles[0];
+  const [allArticles, setAllArticles] = useState(articles);
+  const [article, setArticle] = useState(null);
+
+  useEffect(() => {
+    try {
+      const custom = JSON.parse(localStorage.getItem('customArticles') || '[]');
+      const merged = [...custom, ...articles];
+      setAllArticles(merged);
+      
+      const found = merged.find(a => a.id.toString() === params.slug);
+      if (found) {
+        setArticle(found);
+      } else {
+        setArticle(merged[0]);
+      }
+    } catch(e) {
+      console.error(e);
+      setArticle(articles[0]);
+    }
+  }, [params.slug]);
+
+  if (!article) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
     <div className="bg-gray-50 min-h-screen pt-24 pb-16">
@@ -25,7 +46,7 @@ export default function ArticleDetail({ params }) {
         <header className="mb-10 text-center md:text-left animate-fade-in">
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-6">
             <span className="px-3 py-1 text-xs font-bold uppercase tracking-wider bg-[var(--color-primary-soft)] text-[var(--color-primary)] rounded-full">
-              {article.category[locale]}
+              {article.category[locale] || article.category['id']}
             </span>
             <span className="flex items-center gap-1 text-sm text-gray-500">
               <Calendar size={14} /> {article.date}
@@ -36,19 +57,19 @@ export default function ArticleDetail({ params }) {
           </div>
           
           <h1 className="font-display font-black text-4xl md:text-5xl text-gray-900 leading-tight mb-6">
-            {article.title[locale]}
+            {article.title[locale] || article.title['id']}
           </h1>
           
           <p className="text-xl text-gray-600 leading-relaxed max-w-3xl">
-            {article.excerpt[locale]}
+            {article.excerpt[locale] || article.excerpt['id']}
           </p>
         </header>
 
         {/* Featured Image */}
         <div className="relative w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden mb-12 shadow-[var(--shadow-medium)] animate-fade-in">
           <Image 
-            src={article.image} 
-            alt={article.title[locale]}
+            src={article.image || '/images/bikes/roadbike.png'} 
+            alt={article.title[locale] || article.title['id']}
             fill
             className="object-cover"
             priority
@@ -132,13 +153,13 @@ export default function ArticleDetail({ params }) {
               
               <h4 className="font-bold text-gray-900 mb-4">{locale === 'id' ? 'Artikel Terkait' : 'Related Articles'}</h4>
               <div className="space-y-4">
-                {articles.filter(a => a.id.toString() !== params.slug).slice(0, 2).map((rel) => (
+                {allArticles.filter(a => a.id.toString() !== params.slug).slice(0, 2).map((rel) => (
                   <Link key={rel.id} href={`/artikel/${rel.id}`} className="group flex gap-3 items-center">
                     <div className="w-20 h-20 relative rounded-xl overflow-hidden shrink-0">
-                      <Image src={rel.image} alt={rel.title[locale]} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
+                      <Image src={rel.image || '/images/bikes/roadbike.png'} alt={rel.title[locale] || rel.title['id']} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
                     </div>
                     <div>
-                      <h5 className="text-sm font-bold text-gray-900 group-hover:text-[var(--color-primary)] transition-colors line-clamp-2">{rel.title[locale]}</h5>
+                      <h5 className="text-sm font-bold text-gray-900 group-hover:text-[var(--color-primary)] transition-colors line-clamp-2">{rel.title[locale] || rel.title['id']}</h5>
                       <p className="text-[10px] text-gray-500 mt-1">{rel.date}</p>
                     </div>
                   </Link>

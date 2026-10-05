@@ -5,9 +5,18 @@ import Link from 'next/link';
 import { Activity, MapPin, AlertCircle, Wrench, ChevronRight } from 'lucide-react';
 
 export default function AdminOverviewPage() {
+  const [visitorStats, setVisitorStats] = useState({ today: 0, total: 0 });
+
+  useEffect(() => {
+    fetch('/api/visitors')
+      .then(res => res.json())
+      .then(data => setVisitorStats(data))
+      .catch(console.error);
+  }, []);
+
   const stats = [
     { label: 'Total Revenue (Oct)', value: formatCurrency(12500000), trend: '+15%', isPositive: true },
-    { label: 'Active Bookings', value: '24', trend: '+4', isPositive: true },
+    { label: 'Today\'s Visitors', value: visitorStats.today.toLocaleString(), trend: `${visitorStats.total.toLocaleString()} Total`, isPositive: true },
     { label: 'Available Fleet', value: `${bikes.filter(b => b.available).length}/${bikes.length}`, trend: '-2', isPositive: false },
     { label: 'Pending Partners', value: '5', trend: 'Requires Review', isPositive: false },
   ];

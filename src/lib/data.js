@@ -1,3 +1,36 @@
+// Rental duration options used across the app
+export const rentalDurations = [
+  { key: '2h', label: { id: 'Sewa 2 Jam', en: '2 Hour Rental' }, shortLabel: '2 Jam' },
+  { key: '3h', label: { id: 'Sewa 3 Jam', en: '3 Hour Rental' }, shortLabel: '3 Jam' },
+  { key: '4h', label: { id: 'Sewa 4 Jam', en: '4 Hour Rental' }, shortLabel: '4 Jam' },
+  { key: '6h', label: { id: 'Sewa 6 Jam', en: '6 Hour Rental' }, shortLabel: '6 Jam' },
+  { key: 'day', label: { id: 'Sewa Sehari', en: 'Full Day Rental' }, shortLabel: 'Sehari' },
+];
+
+// Helper: get lowest price from a bike's pricing tiers
+export function getLowestPrice(bike) {
+  const prices = [
+    bike.price2h || 0,
+    bike.price3h || 0,
+    bike.price4h || 0,
+    bike.price6h || 0,
+    bike.pricePerDay || 0,
+  ].filter(p => p > 0);
+  return prices.length > 0 ? Math.min(...prices) : 0;
+}
+
+// Helper: get price by duration key
+export function getPriceByDuration(bike, durationKey) {
+  switch (durationKey) {
+    case '2h': return bike.price2h || 0;
+    case '3h': return bike.price3h || 0;
+    case '4h': return bike.price4h || 0;
+    case '6h': return bike.price6h || 0;
+    case 'day': return bike.pricePerDay || 0;
+    default: return bike.pricePerDay || 0;
+  }
+}
+
 export const bikes = [
   {
     id: 1,
@@ -5,8 +38,12 @@ export const bikes = [
     category: 'roadbike',
     image: '/images/bikes/roadbike.png',
     frameSize: ['S', 'M', 'L', 'XL'],
-    pricePerDay: 250000,
-    pricePerHour: 50000,
+    pricePerDay: 100000,
+    price2h: 25000,
+    price3h: 30000,
+    price4h: 40000,
+    price6h: 50000,
+    popular: true,
     available: true,
     description: { id: 'Road bike karbon premium untuk performa optimal di jalan raya.', en: 'Premium carbon road bike for optimal road performance.' },
     specs: { weight: '7.8kg', groupset: 'Shimano Ultegra R8000', brake: 'Disc Brake', wheel: '700c' },
@@ -17,8 +54,12 @@ export const bikes = [
     category: 'mtb',
     image: '/images/bikes/mtb.png',
     frameSize: ['S', 'M', 'L'],
-    pricePerDay: 200000,
-    pricePerHour: 45000,
+    pricePerDay: 100000,
+    price2h: 25000,
+    price3h: 30000,
+    price4h: 40000,
+    price6h: 50000,
+    popular: false,
     available: true,
     description: { id: 'Full suspension MTB tangguh untuk medan off-road yang menantang.', en: 'Tough full suspension MTB for challenging off-road terrain.' },
     specs: { weight: '13.2kg', groupset: 'Shimano Deore XT', brake: 'Hydraulic Disc', wheel: '29"' },
@@ -29,8 +70,12 @@ export const bikes = [
     category: 'folding',
     image: '/images/bikes/folding.png',
     frameSize: ['One Size'],
-    pricePerDay: 300000,
-    pricePerHour: 60000,
+    pricePerDay: 100000,
+    price2h: 25000,
+    price3h: 30000,
+    price4h: 40000,
+    price6h: 50000,
+    popular: true,
     available: true,
     description: { id: 'Sepeda lipat premium klasik Inggris, kompak dan stylish.', en: 'Classic premium British folding bike, compact and stylish.' },
     specs: { weight: '12.3kg', groupset: '6-speed', brake: 'Rim Brake', wheel: '16"' },
@@ -41,8 +86,12 @@ export const bikes = [
     category: 'ebike',
     image: '/images/bikes/ebike.png',
     frameSize: ['S', 'M', 'L'],
-    pricePerDay: 350000,
-    pricePerHour: 70000,
+    pricePerDay: 100000,
+    price2h: 25000,
+    price3h: 30000,
+    price4h: 40000,
+    price6h: 50000,
+    popular: false,
     available: true,
     description: { id: 'E-bike ringan dengan motor SL 1.1 untuk komuter urban modern.', en: 'Lightweight e-bike with SL 1.1 motor for modern urban commuting.' },
     specs: { weight: '15.0kg', motor: 'SL 1.1 (240W)', battery: '320Wh', range: '130km' },
@@ -53,8 +102,12 @@ export const bikes = [
     category: 'roadbike',
     image: '/images/bikes/roadbike.png',
     frameSize: ['S', 'M', 'L', 'XL'],
-    pricePerDay: 180000,
-    pricePerHour: 40000,
+    pricePerDay: 100000,
+    price2h: 25000,
+    price3h: 30000,
+    price4h: 40000,
+    price6h: 50000,
+    popular: false,
     available: false,
     description: { id: 'Road bike alloy terjangkau dengan performa luar biasa.', en: 'Affordable alloy road bike with outstanding performance.' },
     specs: { weight: '8.9kg', groupset: 'Shimano 105', brake: 'Disc Brake', wheel: '700c' },
@@ -65,8 +118,12 @@ export const bikes = [
     category: 'mtb',
     image: '/images/bikes/mtb.png',
     frameSize: ['S', 'M', 'L'],
-    pricePerDay: 150000,
-    pricePerHour: 35000,
+    pricePerDay: 100000,
+    price2h: 25000,
+    price3h: 30000,
+    price4h: 40000,
+    price6h: 50000,
+    popular: false,
     available: true,
     description: { id: 'Hardtail MTB serbaguna untuk trail ringan hingga sedang.', en: 'Versatile hardtail MTB for light to moderate trails.' },
     specs: { weight: '11.5kg', groupset: 'Shimano Deore', brake: 'Hydraulic Disc', wheel: '27.5"' },

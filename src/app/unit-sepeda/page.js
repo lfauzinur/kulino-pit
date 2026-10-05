@@ -1,14 +1,27 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useI18n } from '@/lib/i18n';
-import { bikes, formatCurrency } from '@/lib/data';
+import { bikes as initialBikes, formatCurrency, getLowestPrice } from '@/lib/data';
+import { Flame } from 'lucide-react';
 
 export default function UnitSepedaPage() {
   const { t, locale } = useI18n();
   const [activeCategory, setActiveCategory] = useState('all');
+  const [bikes, setBikes] = useState(initialBikes);
   const categories = ['all', 'roadbike', 'mtb', 'folding', 'ebike'];
+
+  useEffect(() => {
+    const saved = localStorage.getItem('customBikes');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const merged = initialBikes.map(b => parsed.find(p => p.id === b.id) || b);
+      const newlyAdded = parsed.filter(p => !initialBikes.some(b => b.id === p.id));
+      setBikes([...newlyAdded, ...merged]);
+    }
+  }, []);
+
   const filtered = activeCategory === 'all' ? bikes : bikes.filter(b => b.category === activeCategory);
 
   return (
@@ -35,59 +48,69 @@ export default function UnitSepedaPage() {
 
         {/* Bike Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map(bike => (
-            <article key={bike.id} className="brutal-card overflow-hidden">
-              <div className="relative aspect-square bg-[var(--color-cream-dark)] border-b-3 border-black overflow-hidden group">
-                <Image src={bike.image} alt={bike.name} fill className="object-contain p-6 transition-transform duration-300 group-hover:scale-110" />
-                <span className="absolute top-3 left-3 brutal-badge bg-[var(--color-orange)] text-white text-[8px]">
-                  {t(`bikes.categories.${bike.category}`)}
-                </span>
-                <span className={`absolute top-3 right-3 brutal-badge text-[8px] ${bike.available ? 'bg-[var(--color-green-light)] text-[var(--color-green)]' : 'bg-[var(--color-red-light)] text-[var(--color-red)]'}`}>
-                  ● {bike.available ? t('bikes.available') : t('bikes.booked')}
-                </span>
-              </div>
-              <div className="p-5">
-                <h3 className="font-display font-black text-base">{bike.name}</h3>
-                <p className="text-xs text-[var(--color-gray-500)] mt-1">{bike.description[locale]}</p>
-
-                {/* Specs */}
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {Object.entries(bike.specs).slice(0, 4).map(([key, val]) => (
-                    <div key={key} className="bg-[var(--color-cream)] border border-[var(--color-gray-300)] p-2">
-                      <p className="text-[8px] uppercase font-bold text-[var(--color-gray-500)] tracking-wider">{key}</p>
-                      <p className="text-[10px] font-bold mt-0.5">{val}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Frame Sizes */}
-                <div className="mt-3">
-                  <p className="text-[9px] font-bold uppercase text-[var(--color-gray-500)] mb-1">{t('bikes.frame')}</p>
-                  <div className="flex gap-1">
-                    {bike.frameSize.map(size => (
-                      <span key={size} className="w-8 h-8 border-2 border-black flex items-center justify-center text-[10px] font-bold bg-white hover:bg-[var(--color-orange)] hover:text-white transition-colors cursor-pointer">
-                        {size}
+          {filtered.map(bike => {
+            const lowestPrice = getLowestPrice(bike);
+            return (
+              <article key={bike.id} className="brutal-card overflow-hidden">
+                <div className="relative aspect-square bg-[var(--color-cream-dark)] border-b-3 border-black overflow-hidden group">
+                  <Image src={bike.image} alt={bike.name} fill className="object-contain p-6 transition-transform duration-300 group-hover:scale-110" />
+                  <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+                    <span className="brutal-badge bg-[var(--color-orange)] text-white text-[8px]">
+                      {t(`bikes.categories.${bike.category}`)}
+                    </span>
+                    {bike.popular && (
+                      <span className="brutal-badge bg-amber-400 text-amber-900 text-[8px] flex items-center gap-1 !border-amber-500">
+                        <Flame size={10} /> POPULAR
                       </span>
+                    )}
+                  </div>
+                  <span className={`absolute top-3 right-3 brutal-badge text-[8px] ${bike.available ? 'bg-[var(--color-green-light)] text-[var(--color-green)]' : 'bg-[var(--color-red-light)] text-[var(--color-red)]'}`}>
+                    ● {bike.available ? t('bikes.available') : t('bikes.booked')}
+                  </span>
+                </div>
+                <div className="p-5">
+                  <h3 className="font-display font-black text-base">{bike.name}</h3>
+                  <p className="text-xs text-[var(--color-gray-500)] mt-1">{bike.description[locale]}</p>
+
+                  {/* Specs */}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {Object.entries(bike.specs).slice(0, 4).map(([key, val]) => (
+                      <div key={key} className="bg-[var(--color-cream)] border border-[var(--color-gray-300)] p-2">
+                        <p className="text-[8px] uppercase font-bold text-[var(--color-gray-500)] tracking-wider">{key}</p>
+                        <p className="text-[10px] font-bold mt-0.5">{val}</p>
+                      </div>
                     ))}
                   </div>
-                </div>
 
-                {/* Pricing & CTA */}
-                <div className="mt-4 flex items-end justify-between border-t-2 border-dashed border-[var(--color-gray-300)] pt-4">
-                  <div>
-                    <p className="font-display font-black text-xl text-[var(--color-orange)]">{formatCurrency(bike.pricePerDay)}</p>
-                    <p className="text-[9px] text-[var(--color-gray-500)]">{t('bikes.perDay')} | {formatCurrency(bike.pricePerHour)} {t('bikes.perHour')}</p>
+                  {/* Frame Sizes */}
+                  <div className="mt-3">
+                    <p className="text-[9px] font-bold uppercase text-[var(--color-gray-500)] mb-1">{t('bikes.frame')}</p>
+                    <div className="flex gap-1">
+                      {bike.frameSize.map(size => (
+                        <span key={size} className="w-8 h-8 border-2 border-black flex items-center justify-center text-[10px] font-bold bg-white hover:bg-[var(--color-orange)] hover:text-white transition-colors cursor-pointer">
+                          {size}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <Link
-                    href={bike.available ? '/booking' : '#'}
-                    className={`brutal-btn px-4 py-2.5 text-[10px] ${bike.available ? 'brutal-btn-primary' : 'brutal-btn-secondary opacity-50 cursor-not-allowed'}`}
-                  >
-                    {t('bikes.checkAvail')}
-                  </Link>
+
+                  {/* Pricing & CTA */}
+                  <div className="mt-4 flex items-end justify-between border-t-2 border-dashed border-[var(--color-gray-300)] pt-4">
+                    <div>
+                      <p className="text-[9px] text-[var(--color-gray-500)] mb-0.5">{locale === 'id' ? 'Mulai dari' : 'Starting from'}</p>
+                      <p className="font-display font-black text-xl text-[var(--color-orange)]">{formatCurrency(lowestPrice)}</p>
+                    </div>
+                    <Link
+                      href={bike.available ? '/booking' : '#'}
+                      className={`brutal-btn px-4 py-2.5 text-[10px] ${bike.available ? 'brutal-btn-primary' : 'brutal-btn-secondary opacity-50 cursor-not-allowed'}`}
+                    >
+                      {t('bikes.checkAvail')}
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </div>
     </div>

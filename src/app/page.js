@@ -2,8 +2,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
-import { bikes, testimonials, tours, formatCurrency } from '@/lib/data';
-import { MapPin, Calendar, Search, Map, CreditCard, Briefcase, Plus, Users, User, Star } from 'lucide-react';
+import { bikes, testimonials, tours, formatCurrency, getLowestPrice } from '@/lib/data';
+import { MapPin, Calendar, Search, Map, CreditCard, Briefcase, Plus, Users, User, Star, Flame } from 'lucide-react';
+import VisitorTracker from '@/components/VisitorTracker';
 
 /* ─── Hero Section ─── */
 function HeroSection({ t, locale }) {
@@ -228,14 +229,19 @@ function FeaturedBikes({ t }) {
                   className="object-contain p-4 transition-transform duration-500 group-hover:scale-110"
                   sizes="(max-width: 768px) 100vw, 33vw"
                 />
+                {bike.popular && (
+                  <span className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-[9px] font-bold border border-amber-200 z-10">
+                    <Flame size={10} /> Popular
+                  </span>
+                )}
               </div>
               <div className="p-6 flex-1 flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)] mb-2 block">{bike.category}</span>
                 <h3 className="font-display font-bold text-lg text-gray-900 mb-4">{bike.name}</h3>
                 <div className="mt-auto flex items-center justify-between">
                   <div>
-                    <span className="text-xl font-black text-gray-900">Rp {(bike.pricePerDay / 1000).toFixed(0)}k</span>
-                    <span className="text-xs text-gray-500 font-medium"> / day</span>
+                    <span className="text-[9px] text-gray-400 block">Mulai dari</span>
+                    <span className="text-xl font-black text-gray-900">{formatCurrency(getLowestPrice(bike))}</span>
                   </div>
                   <Link href="/unit-sepeda" className="w-10 h-10 rounded-full bg-[var(--color-primary-soft)] text-[var(--color-primary)] flex items-center justify-center hover:bg-[var(--color-primary)] hover:text-white transition-colors">
                     <Plus size={20} />
@@ -446,6 +452,7 @@ export default function LandingPage() {
       <FeaturedBikes t={t} />
       <PopularTours t={t} locale={locale} />
       <TestimonialSection t={t} locale={locale} />
+      <VisitorTracker />
     </div>
   );
 }
