@@ -439,6 +439,49 @@ function TestimonialSection({ t, locale }) {
   );
 }
 
+/* ─── Partners Section ─── */
+function PartnersSection({ t, locale }) {
+  const partners = [
+    { name: 'Kulino House', logo: '/images/partners/kulino-house.png', url: '#' },
+    { name: 'Kulino Class', logo: '/images/partners/kulino-class.png', url: '#' },
+    { name: 'Kulino Coin', logo: '/images/partners/kulino-coin.png', url: '#' },
+    { name: 'Kulino Properti', logo: '/images/partners/kulino-properti.png', url: '#' },
+    { name: 'Kulino Merchant', logo: '/images/partners/kulino-merchant.png', url: '#' },
+  ];
+
+  return (
+    <section className="py-16 bg-gray-50 border-y border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-10">
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+            {locale === 'id' ? 'Tergabung dalam Ekosistem' : 'Part of Ecosystem'}
+          </h2>
+        </div>
+        <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
+          {partners.map((partner, i) => (
+            <a 
+              key={i} 
+              href={partner.url}
+              target="_blank"
+              rel="noopener noreferrer" 
+              className="group relative w-24 h-24 md:w-32 md:h-32 transition-transform hover:scale-105"
+            >
+              <div className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-gray-100 group-hover:border-[var(--color-primary)] group-hover:shadow-md transition-all duration-300 flex items-center justify-center p-3">
+                <Image 
+                  src={partner.logo} 
+                  alt={partner.name} 
+                  fill 
+                  className="object-contain p-2 grayscale group-hover:grayscale-0 opacity-70 group-hover:opacity-100 transition-all duration-300"
+                />
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ─── Main Landing Page ─── */
 export default function LandingPage() {
   const { t, locale } = useI18n();
@@ -451,6 +494,7 @@ export default function LandingPage() {
       <RentalOptions t={t} locale={locale} />
       <FeaturedBikes t={t} />
       <PopularTours t={t} locale={locale} />
+      <PartnersSection t={t} locale={locale} />
       <TestimonialSection t={t} locale={locale} />
       <VisitorTracker />
     </div>
