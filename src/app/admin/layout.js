@@ -27,14 +27,15 @@ export default function AdminLayout({ children }) {
     router.push('/admin/login');
   };
 
-  if (isChecking) return <div className="min-h-screen bg-gray-50"></div>;
-
-  // If we are on the login page, don't render the sidebar
+  // If we are on the login page, don't render the sidebar, just the content
   if (pathname === '/admin/login') {
-    return <I18nProvider>{children}</I18nProvider>;
+    return <>{children}</>;
   }
 
-  if (!isAuthenticated) return null;
+  // Prevent flash of content while checking auth
+  if (isChecking || !isAuthenticated) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>;
+  }
 
   const menu = [
     { href: '/admin', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },

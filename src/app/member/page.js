@@ -235,25 +235,101 @@ function ReferralTab({ t, locale }) {
   );
 }
 
-/* ─── Ride Tracker Tab (Prototype) ─── */
+/* ─── Ride Tracker Tab (Real GPS) ─── */
 function RideTrackerTab({ t, locale }) {
   const [isTracking, setIsTracking] = useState(false);
   const [time, setTime] = useState(0);
   const [distance, setDistance] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
+  
+  // GPS State
+  const [location, setLocation] = useState({ lat: -8.2192, lng: 114.3692 });
+  const [speed, setSpeed] = useState(0); // in km/h
+  const [gpsStatus, setGpsStatus] = useState('WAITING FOR SIGNAL');
+  const watchIdRef = useRef(null);
+  const timerRef = useRef(null);
+  const lastCoordsRef = useRef(null);
+
+  // Haversine formula to calculate distance between two coordinates in km
+  const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    return R * c; // Distance in km
+  };
 
   const handleToggleTrack = () => {
     if (isTracking) {
+      // Stop Tracking
       setIsTracking(false);
+      setGpsStatus('TRACKING STOPPED');
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
     } else {
+      // Start Tracking
       setIsTracking(true);
-      const interval = setInterval(() => {
+      setGpsStatus('ACQUIRING SIGNAL...');
+      
+      // Timer
+      timerRef.current = setInterval(() => {
         setTime(prev => prev + 1);
-        setDistance(prev => prev + 0.005);
       }, 1000);
-      setTimeout(() => clearInterval(interval), 10000);
+
+      // GPS Watch
+      if ('geolocation' in navigator) {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            setGpsStatus('SIGNAL ACQUIRED');
+            const { latitude, longitude, speed: gpsSpeed } = position.coords;
+            
+            // Calculate distance if we have a previous point
+            if (lastCoordsRef.current) {
+              const dist = getDistanceFromLatLonInKm(
+                lastCoordsRef.current.latitude,
+                lastCoordsRef.current.longitude,
+                latitude,
+                longitude
+              );
+              // Only add if it's a significant move (>2 meters) to avoid GPS jitter
+              if (dist > 0.002) {
+                setDistance(prev => prev + dist);
+              }
+            }
+            
+            lastCoordsRef.current = { latitude, longitude };
+            setLocation({ lat: latitude, lng: longitude });
+            
+            // Speed is in m/s, convert to km/h. If null, calculate manually (omitted for brevity, assume 0 if null)
+            if (gpsSpeed !== null) {
+              setSpeed((gpsSpeed * 3.6).toFixed(1));
+            } else {
+              setSpeed(0);
+            }
+          },
+          (error) => {
+            console.error(error);
+            setGpsStatus('GPS ERROR/DENIED');
+          },
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+        );
+      } else {
+        setGpsStatus('GPS NOT SUPPORTED');
+      }
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   const formatTime = (totalSeconds) => {
     const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
@@ -323,18 +399,27 @@ function RideTrackerTab({ t, locale }) {
   return (
     <div>
       <div className="clean-card overflow-hidden bg-white mb-6">
+        {/* MAP EMBED */}
         <div className="h-64 bg-gray-100 relative flex flex-col items-center justify-center overflow-hidden border-b border-gray-100">
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--color-black)_1px,_transparent_1px)] bg-[size:10px_10px]"></div>
-          <svg className="absolute w-full h-full stroke-[var(--color-primary)] stroke-[4px] fill-transparent stroke-dasharray-[10_10] animate-[dash_20s_linear_infinite]" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path d="M 10 90 Q 30 10 50 50 T 90 10" />
-          </svg>
-          <div className="z-10 bg-white/90 backdrop-blur rounded-2xl p-4 text-center shadow-sm border border-gray-100">
+          <iframe
+            width="100%"
+            height="100%"
+            frameBorder="0"
+            scrolling="no"
+            marginHeight="0"
+            marginWidth="0"
+            src={`https://www.openstreetmap.org/export/embed.html?bbox=${location.lng - 0.02},${location.lat - 0.02},${location.lng + 0.02},${location.lat + 0.02}&layer=mapnik&marker=${location.lat},${location.lng}`}
+            className="absolute inset-0 z-0"
+          ></iframe>
+          <div className="z-10 absolute top-4 left-4 bg-white/95 backdrop-blur rounded-2xl p-3 text-center shadow-md border border-gray-100">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1 flex items-center justify-center gap-1"><MapIcon size={12}/> GPS Status</p>
-            <p className="font-display font-black text-lg text-green-600">SIGNAL ACQUIRED</p>
+            <p className={`font-display font-black text-sm ${gpsStatus.includes('ERROR') || gpsStatus.includes('NOT') ? 'text-red-500' : gpsStatus === 'SIGNAL ACQUIRED' ? 'text-green-600' : 'text-yellow-600'}`}>
+              {gpsStatus}
+            </p>
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 relative z-10 bg-white">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="p-4 rounded-2xl bg-gray-50 text-center border border-gray-100">
               <p className="text-[9px] font-bold uppercase text-gray-500 mb-1">{t('member.time')}</p>
@@ -346,7 +431,7 @@ function RideTrackerTab({ t, locale }) {
             </div>
             <div className="p-4 rounded-2xl bg-gray-50 text-center border border-gray-100">
               <p className="text-[9px] font-bold uppercase text-gray-500 mb-1">{t('member.avgSpeed')}</p>
-              <p className="font-display font-black text-2xl text-gray-900">{isTracking ? '18.0' : '0.0'}<span className="text-xs text-gray-400">km/h</span></p>
+              <p className="font-display font-black text-2xl text-gray-900">{speed}<span className="text-xs text-gray-400">km/h</span></p>
             </div>
             <div className="p-4 rounded-2xl bg-gray-50 text-center border border-gray-100">
               <p className="text-[9px] font-bold uppercase text-gray-500 mb-1">{t('member.calories')}</p>
@@ -400,7 +485,7 @@ function RideTrackerTab({ t, locale }) {
                   </div>
                   <div>
                     <p className="text-[8px] text-gray-400 uppercase font-bold">{t('member.avgSpeed')}</p>
-                    <p className="font-display font-black text-sm text-gray-900">{isTracking ? '18.0' : '0.0'}km/h</p>
+                    <p className="font-display font-black text-sm text-gray-900">{speed}km/h</p>
                   </div>
                   <div>
                     <p className="text-[8px] text-gray-400 uppercase font-bold">{t('member.calories')}</p>
