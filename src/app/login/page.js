@@ -18,6 +18,19 @@ export default function UnifiedLogin() {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
+  // Read bookBike & redirect from URL search params
+  const getRedirectUrl = (role) => {
+    if (typeof window === 'undefined') return `/${role}`;
+    const params = new URLSearchParams(window.location.search);
+    const bookBike = params.get('bookBike');
+    const redirect = params.get('redirect');
+    if (role === 'member' || role === 'default') {
+      const base = redirect || '/member';
+      return bookBike ? `${base}?bookBike=${bookBike}` : base;
+    }
+    return `/${role}`;
+  };
+
   const handleLogin = (e) => {
     e.preventDefault();
     setLoading(true);
@@ -26,13 +39,13 @@ export default function UnifiedLogin() {
       const idStr = identifier.toLowerCase();
       if (idStr === 'admin') {
         localStorage.setItem('isAdmin', 'true');
-        router.push('/admin');
+        router.push(getRedirectUrl('admin'));
       } else if (idStr === 'partner') {
         localStorage.setItem('isPartner', 'true');
-        router.push('/partner');
+        router.push(getRedirectUrl('partner'));
       } else {
         localStorage.setItem('isMember', 'true');
-        router.push('/member');
+        router.push(getRedirectUrl('default'));
       }
     }, 1000);
   };
@@ -41,7 +54,7 @@ export default function UnifiedLogin() {
     setLoading(true);
     setTimeout(() => {
       localStorage.setItem('isMember', 'true');
-      router.push('/member');
+      router.push(getRedirectUrl('default'));
     }, 1000);
   };
 

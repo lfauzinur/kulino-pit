@@ -14,7 +14,8 @@ import {
   Trophy, Bike, DollarSign, Star, CheckCircle, Clock, Info, 
   Map as MapIcon, MousePointerClick, Users, CreditCard, LogOut,
   Share2, Link2, RotateCcw, Gift, AlertTriangle, ChevronRight,
-  Sparkles, Compass, ArrowUpRight, Flame, Home, QrCode, ArrowLeft, Download, ShieldCheck
+  Sparkles, Compass, ArrowUpRight, Flame, Home, QrCode, ArrowLeft, Download, ShieldCheck,
+  Navigation2, Route, History, Play, Square, Timer
 } from 'lucide-react';
 
 /* ─── Active Booking Countdown Timer ─── */
@@ -184,7 +185,7 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
     },
   ];
 
-  /* Gambar 1: Icon SENADA dengan UI Kulino Pit (Semua menggunakan bg-sky-50 text-[var(--color-primary)]) */
+  /* Icon SENADA dengan UI Kulino Pit — Spin Wheel & Tukar Poin digabung jadi "Poin & Hadiah" */
   const quickFeatures = [
     { 
       name: 'Ride Tracker', 
@@ -196,12 +197,12 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
       name: 'Sewa Sepeda', 
       desc: 'Armada Unit',
       icon: <Bike size={22} className="text-[var(--color-primary)]" />, 
-      action: () => onOpenBikeCatalog(), // In-App Bike Picker (tidak lempar ke landing page)
+      action: () => onOpenBikeCatalog(),
     },
     { 
-      name: 'Spin Wheel', 
-      desc: 'Putar Hadiah',
-      icon: <RotateCcw size={22} className="text-[var(--color-primary)]" />, 
+      name: 'Poin & Hadiah', 
+      desc: 'Spin & Reward',
+      icon: <Award size={22} className="text-[var(--color-primary)]" />, 
       action: () => setActiveTab('points'), 
     },
     { 
@@ -211,10 +212,10 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
       action: () => setActiveTab('calendar'), 
     },
     { 
-      name: 'Tukar Poin', 
-      desc: 'Katalog Reward',
-      icon: <Award size={22} className="text-[var(--color-primary)]" />, 
-      action: () => setActiveTab('points'), 
+      name: 'Rute Gowes', 
+      desc: 'Navigasi GPS',
+      icon: <Navigation2 size={22} className="text-[var(--color-primary)]" />, 
+      action: () => setActiveTab('routes'), 
     },
     { 
       name: 'Komisi Ajak', 
@@ -223,10 +224,10 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
       action: () => setActiveTab('referral'), 
     },
     { 
-      name: 'Rute Gowes', 
-      desc: 'Jalur Pilihan',
-      icon: <MapIcon size={22} className="text-[var(--color-primary)]" />, 
-      action: () => setActiveTab('tracker'), 
+      name: 'Riwayat Sewa', 
+      desc: 'Log Booking',
+      icon: <History size={22} className="text-[var(--color-primary)]" />, 
+      action: () => setActiveTab('calendar'), 
     },
     { 
       name: 'Pasang PWA', 
@@ -913,6 +914,420 @@ function CalendarTab({ t, locale }) {
   );
 }
 
+/* ─── Rute Gowes Tab (Cycling Route Navigation - Inspired by Sewa Jetski Banyuwangi) ─── */
+function RuteGowesTab({ t, locale }) {
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [distanceTraveled, setDistanceTraveled] = useState(0);
+  const [currentSpeed, setCurrentSpeed] = useState(0);
+  const [userPosition, setUserPosition] = useState(null);
+  const [reachedCheckpoints, setReachedCheckpoints] = useState(new Set());
+  const [isPaused, setIsPaused] = useState(false);
+  const timerRef = useRef(null);
+
+  // Default cycling routes (admin can manage these via /admin/routes)
+  const [cyclingRoutes, setCyclingRoutes] = useState([]);
+
+  useEffect(() => {
+    // Load admin-created routes from localStorage
+    const stored = localStorage.getItem('kulinoPitRoutes');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCyclingRoutes(parsed.filter(r => r.active !== false));
+          return;
+        }
+      } catch (e) { /* use defaults */ }
+    }
+    // Default curated routes for Banyuwangi
+    setCyclingRoutes(DEFAULT_CYCLING_ROUTES);
+  }, []);
+
+  // GPS Watcher
+  useEffect(() => {
+    if (!isNavigating || isPaused) return;
+    if (!('geolocation' in navigator)) return;
+
+    let prevPos = null;
+    let prevTime = Date.now();
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const newPos = { lat, lng };
+        setUserPosition(newPos);
+
+        let speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
+        if (!pos.coords.speed && prevPos) {
+          const timeDiff = (Date.now() - prevTime) / 1000;
+          if (timeDiff > 1) {
+            const R = 6371;
+            const dLat = (lat - prevPos.lat) * Math.PI / 180;
+            const dLon = (lng - prevPos.lng) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(prevPos.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLon/2)**2;
+            const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            speed = distKm / (timeDiff / 3600);
+            setDistanceTraveled(prev => prev + distKm);
+          }
+        } else if (pos.coords.speed && prevPos) {
+          const timeDiff = (Date.now() - prevTime) / 1000;
+          setDistanceTraveled(prev => prev + (speed / 3600) * timeDiff);
+        }
+
+        prevPos = newPos;
+        prevTime = Date.now();
+        setCurrentSpeed(Math.min(60, Math.round(speed)));
+
+        // Checkpoint detection (within 80m)
+        if (selectedRoute?.checkpoints) {
+          selectedRoute.checkpoints.forEach((cp, idx) => {
+            const cpId = cp.id || `cp-${idx}`;
+            if (reachedCheckpoints.has(cpId)) return;
+            const R2 = 6371;
+            const dLat2 = (cp.lat - lat) * Math.PI / 180;
+            const dLon2 = (cp.lng - lng) * Math.PI / 180;
+            const a2 = Math.sin(dLat2/2)**2 + Math.cos(lat*Math.PI/180)*Math.cos(cp.lat*Math.PI/180)*Math.sin(dLon2/2)**2;
+            const distKm2 = R2 * 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1-a2));
+            if (distKm2 <= 0.08) {
+              setReachedCheckpoints(prev => new Set(prev).add(cpId));
+              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            }
+          });
+        }
+      },
+      () => {
+        // Fallback for GPS error - set mock position near Banyuwangi
+        setUserPosition({ lat: -8.2192, lng: 114.3692 });
+      },
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 8000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [isNavigating, isPaused, selectedRoute, reachedCheckpoints]);
+
+  // Timer
+  useEffect(() => {
+    if (isNavigating && !isPaused) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [isNavigating, isPaused]);
+
+  const formatTimer = (s) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+  };
+
+  const startNavigation = (route) => {
+    setSelectedRoute(route);
+    setIsNavigating(true);
+    setElapsedTime(0);
+    setDistanceTraveled(0);
+    setCurrentSpeed(0);
+    setReachedCheckpoints(new Set());
+    setIsPaused(false);
+  };
+
+  const stopNavigation = () => {
+    setIsNavigating(false);
+    setSelectedRoute(null);
+    setElapsedTime(0);
+    setDistanceTraveled(0);
+    setCurrentSpeed(0);
+    setReachedCheckpoints(new Set());
+    clearInterval(timerRef.current);
+  };
+
+  // NAVIGASI AKTIF VIEW
+  if (isNavigating && selectedRoute) {
+    const checkpoints = selectedRoute.checkpoints || [];
+    const totalCheckpoints = checkpoints.length;
+    const completedCheckpoints = reachedCheckpoints.size;
+    const progressPct = totalCheckpoints > 0 ? Math.round((completedCheckpoints / totalCheckpoints) * 100) : 0;
+
+    return (
+      <div className="space-y-5">
+        {/* Active Route Header */}
+        <div className="bg-gradient-to-br from-slate-900 to-sky-950 rounded-[28px] p-5 text-white shadow-xl relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-[var(--color-primary)]/20 rounded-full blur-2xl" />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${selectedRoute.color || '#0EA5E9'}25` }}>
+                  <Navigation2 size={20} style={{ color: selectedRoute.color || '#0EA5E9' }} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-sky-300">Navigasi Aktif</p>
+                  <h3 className="font-display font-black text-sm text-white leading-tight">{selectedRoute.name}</h3>
+                </div>
+              </div>
+              <button onClick={stopNavigation} className="px-3 py-1.5 rounded-xl bg-red-500/20 text-red-300 border border-red-500/30 text-[10px] font-bold hover:bg-red-500/30 transition-colors cursor-pointer">
+                Berhenti
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-[10px] text-sky-200 font-bold mb-1">
+                <span>Progress Checkpoint</span>
+                <span>{completedCheckpoints}/{totalCheckpoints} ({progressPct}%)</span>
+              </div>
+              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-sky-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+              </div>
+            </div>
+
+            {/* Live Telemetry HUD */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-slate-800/60 rounded-xl p-3 text-center border border-slate-700/50">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Waktu</p>
+                <p className="font-mono font-black text-lg text-sky-300">{formatTimer(elapsedTime)}</p>
+              </div>
+              <div className="bg-slate-800/60 rounded-xl p-3 text-center border border-slate-700/50">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Jarak</p>
+                <p className="font-mono font-black text-lg text-emerald-300">{distanceTraveled.toFixed(1)} <span className="text-[10px] text-slate-400">km</span></p>
+              </div>
+              <div className="bg-slate-800/60 rounded-xl p-3 text-center border border-slate-700/50">
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Kecepatan</p>
+                <p className="font-mono font-black text-lg text-amber-300">{currentSpeed} <span className="text-[10px] text-slate-400">km/h</span></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setIsPaused(!isPaused)}
+            className={`flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer transition-colors ${
+              isPaused 
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200'
+            }`}
+          >
+            {isPaused ? <><Play size={16} /> Lanjutkan</> : <><Square size={14} /> Jeda</>}
+          </button>
+          <button
+            onClick={stopNavigation}
+            className="flex-1 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 shadow-md cursor-pointer transition-colors"
+          >
+            <Square size={14} /> Selesai Gowes
+          </button>
+        </div>
+
+        {/* Checkpoint List */}
+        <div className="bg-white rounded-[26px] p-5 shadow-sm border border-gray-100">
+          <h3 className="font-display font-black text-sm text-gray-900 mb-3 flex items-center gap-2">
+            <MapPin size={16} className="text-[var(--color-primary)]" /> Checkpoint Rute ({completedCheckpoints}/{totalCheckpoints})
+          </h3>
+          <div className="space-y-2">
+            {checkpoints.map((cp, idx) => {
+              const cpId = cp.id || `cp-${idx}`;
+              const isReached = reachedCheckpoints.has(cpId);
+              return (
+                <div key={cpId} className={`p-3 rounded-xl flex items-center gap-3 transition-all ${
+                  isReached ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-100'
+                }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                    isReached ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {isReached ? '✓' : idx + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`font-bold text-xs ${isReached ? 'text-emerald-800' : 'text-gray-900'}`}>{cp.name}</p>
+                    <p className="text-[10px] text-gray-500 truncate">{cp.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ROUTE SELECTION VIEW
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-white rounded-[26px] p-5 shadow-sm border border-gray-100">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-11 h-11 rounded-xl bg-sky-50 flex items-center justify-center">
+            <Navigation2 size={22} className="text-[var(--color-primary)]" />
+          </div>
+          <div>
+            <h2 className="font-display font-black text-base text-gray-900">Rute Gowes Banyuwangi</h2>
+            <p className="text-[10px] text-gray-500 font-medium">Panduan jalur bersepeda interaktif dengan GPS tracking.</p>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 leading-relaxed bg-sky-50 p-3 rounded-xl border border-sky-100">
+          Pilih rute gowes di bawah ini untuk memulai navigasi. GPS akan otomatis melacak posisi, kecepatan, dan jarak tempuh Anda secara real-time.
+        </p>
+      </div>
+
+      {/* Route Cards */}
+      {cyclingRoutes.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-[26px] border border-gray-100 shadow-sm">
+          <Navigation2 size={32} className="mx-auto text-gray-300 mb-3" />
+          <p className="text-sm text-gray-500 font-medium">Belum ada rute aktif yang tersedia.</p>
+          <p className="text-xs text-gray-400 mt-1">Admin dapat membuat rute baru di halaman Admin → Rute Gowes.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {cyclingRoutes.map((route) => {
+            const checkpointsCount = route.checkpoints?.length || 0;
+            const isPro = route.difficulty === 'Mahir';
+            const isMedium = route.difficulty === 'Menengah';
+
+            return (
+              <div
+                key={route.id}
+                onClick={() => startNavigation(route)}
+                className="bg-white hover:bg-sky-50/30 rounded-[24px] p-5 border border-gray-100 hover:border-sky-200 shadow-[0_8px_30px_rgb(0,0,0,0.06)] transition-all cursor-pointer group flex flex-col justify-between"
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div 
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform" 
+                      style={{ backgroundColor: `${route.color || '#0EA5E9'}15`, color: route.color || '#0EA5E9' }}
+                    >
+                      <Navigation2 size={24} style={{ color: route.color || '#0EA5E9' }} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-base text-gray-900 group-hover:text-[var(--color-primary)] transition-colors leading-snug truncate">
+                        {route.name}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                          isPro ? 'bg-amber-50 text-amber-800 border border-amber-200' :
+                          isMedium ? 'bg-blue-50 text-blue-800 border border-blue-200' :
+                          'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        }`}>
+                          {route.difficulty || 'Pemula'}
+                        </span>
+                        <span className="text-gray-300 text-xs">•</span>
+                        <span className="text-xs text-gray-500 font-semibold flex items-center gap-1">
+                          <Clock size={12} className="text-gray-400" />
+                          {route.duration_min ? `${route.duration_min} mnt` : '45 mnt'}
+                        </span>
+                        <span className="text-gray-300 text-xs">•</span>
+                        <span className="text-xs text-gray-500 font-semibold">
+                          {route.distance_km ? `${route.distance_km} km` : '~5 km'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--color-primary)] group-hover:text-white transition-colors shrink-0 mt-1">
+                    <ChevronRight size={18} />
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 mt-2 mb-3">
+                  {route.description}
+                </p>
+
+                {/* Checkpoints & CTA Strip */}
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 text-gray-600 font-bold">
+                    <MapPin size={13} className="text-[var(--color-primary)]" />
+                    <span>{checkpointsCount} Titik Checkpoint</span>
+                  </div>
+                  <span className="text-xs font-black text-[var(--color-primary)] group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                    <span>Mulai Navigasi</span>
+                    <span>→</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Free Ride Option */}
+      <button 
+        onClick={() => startNavigation({ 
+          id: 'free-ride', 
+          name: 'Jelajah Bebas', 
+          description: 'Bersepeda bebas tanpa rute panduan, GPS tetap aktif.',
+          color: '#64748B',
+          checkpoints: [],
+          difficulty: 'Bebas',
+          distance_km: '-',
+          duration_min: '-'
+        })}
+        className="w-full bg-white hover:bg-gray-50 text-gray-700 font-bold p-4 rounded-[22px] border-2 border-dashed border-gray-200 text-center text-xs tracking-wider uppercase transition-all cursor-pointer shadow-2xs flex items-center justify-center gap-2"
+      >
+        <Compass size={16} />
+        <span>Jelajah Bebas (Tanpa Jalur Panduan)</span>
+      </button>
+    </div>
+  );
+}
+
+// Default Cycling Routes for Banyuwangi
+const DEFAULT_CYCLING_ROUTES = [
+  {
+    id: 'route-1',
+    name: 'Rute Sunrise Pantai Boom',
+    description: 'Rute santai menikmati sunrise di sepanjang Pantai Boom Marina. Cocok untuk pemula dan keluarga dengan pemandangan laut yang memukau.',
+    color: '#10B981',
+    difficulty: 'Pemula',
+    distance_km: 5.2,
+    duration_min: 30,
+    elevation_m: 15,
+    active: true,
+    checkpoints: [
+      { id: 'cp1-1', name: 'Start: Kulino House', description: 'Titik kumpul dan briefing awal', lat: -8.2192, lng: 114.3692 },
+      { id: 'cp1-2', name: 'Taman Blambangan', description: 'Alun-alun ikonik Banyuwangi', lat: -8.2198, lng: 114.3548 },
+      { id: 'cp1-3', name: 'Dermaga Pantai Boom', description: 'Spot sunrise terbaik', lat: -8.2046, lng: 114.3855 },
+      { id: 'cp1-4', name: 'Finish: Marina Bay', description: 'Checkpoint akhir dan foto bersama', lat: -8.2063, lng: 114.3873 },
+    ],
+  },
+  {
+    id: 'route-2',
+    name: 'Rute Kota Heritage Banyuwangi',
+    description: 'Susuri bangunan-bangunan bersejarah kota Banyuwangi, melewati pecinan, masjid agung, dan kawasan kuliner legendaris.',
+    color: '#3B82F6',
+    difficulty: 'Menengah',
+    distance_km: 8.7,
+    duration_min: 50,
+    elevation_m: 35,
+    active: true,
+    checkpoints: [
+      { id: 'cp2-1', name: 'Start: Kulino House', description: 'Titik kumpul utama', lat: -8.2192, lng: 114.3692 },
+      { id: 'cp2-2', name: 'Masjid Agung Baiturrahman', description: 'Landmark spiritual kota Banyuwangi', lat: -8.2185, lng: 114.3530 },
+      { id: 'cp2-3', name: 'Kampung Pecinan', description: 'Kawasan etnis Tionghoa bersejarah', lat: -8.2165, lng: 114.3505 },
+      { id: 'cp2-4', name: 'Stasiun Banyuwangi Baru', description: 'Stasiun kereta terujung timur Jawa', lat: -8.2248, lng: 114.3500 },
+      { id: 'cp2-5', name: 'Finish: Kuliner Osing', description: 'Pasar kuliner dan checkpoint akhir', lat: -8.2210, lng: 114.3622 },
+    ],
+  },
+  {
+    id: 'route-3',
+    name: 'Rute Ijen Foothills Challenge',
+    description: 'Tantangan tanjakan menuju kaki Gunung Ijen. Hanya untuk pesepeda berpengalaman. Pemandangan perkebunan kopi dan hutan tropis.',
+    color: '#F59E0B',
+    difficulty: 'Mahir',
+    distance_km: 18.5,
+    duration_min: 120,
+    elevation_m: 450,
+    active: true,
+    checkpoints: [
+      { id: 'cp3-1', name: 'Start: Kulino House', description: 'Briefing khusus rute mahir', lat: -8.2192, lng: 114.3692 },
+      { id: 'cp3-2', name: 'Gapura Licin', description: 'Pintu masuk kawasan pegunungan', lat: -8.1550, lng: 114.2510 },
+      { id: 'cp3-3', name: 'Perkebunan Kopi Kayumas', description: 'Rest area dan foto di kebun kopi arabika', lat: -8.1205, lng: 114.2380 },
+      { id: 'cp3-4', name: 'Pos Paltuding', description: 'Pos terakhir sebelum jalur pendakian Ijen', lat: -8.0650, lng: 114.2420 },
+      { id: 'cp3-5', name: 'Finish: Warung Puncak', description: 'Istirahat dan checkpoint akhir', lat: -8.0820, lng: 114.2400 },
+    ],
+  },
+];
+
 /* ─── Spin Wheel & Points Tab ─── */
 function SpinWheelAndPointsTab({ t, locale }) {
   const canvasRef = useRef(null);
@@ -1263,6 +1678,22 @@ export default function MemberPage() {
         }
       } catch (e) { /* ignore */ }
     }
+
+    // Auto-open booking modal from URL ?bookBike=<id> (landing page → member PWA flow)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const bookBikeId = params.get('bookBike');
+      if (bookBikeId) {
+        const targetBike = bikes.find(b => String(b.id) === String(bookBikeId));
+        if (targetBike) {
+          setTimeout(() => {
+            setSelectedBookingBike(targetBike);
+          }, 500);
+        }
+        // Clean the URL without reload
+        window.history.replaceState({}, '', '/member');
+      }
+    }
   }, [router]);
 
   const handleLogout = () => {
@@ -1282,6 +1713,7 @@ export default function MemberPage() {
   const tabs = [
     { id: 'dashboard', label: 'Beranda', icon: <Home size={18} /> },
     { id: 'tracker', label: 'Ride Tracker', icon: <Compass size={18} /> },
+    { id: 'routes', label: 'Rute Gowes', icon: <Navigation2 size={18} /> },
     { id: 'calendar', label: 'Kalender', icon: <CalendarDays size={18} /> },
     { id: 'points', label: 'Poin & Hadiah', icon: <Award size={18} /> },
     { id: 'referral', label: 'Komisi Referral', icon: <LinkIcon size={18} /> },
@@ -1398,6 +1830,9 @@ export default function MemberPage() {
           )}
           {activeTab === 'tracker' && (
             <RideTrackerTab t={t} locale={locale} />
+          )}
+          {activeTab === 'routes' && (
+            <RuteGowesTab t={t} locale={locale} />
           )}
           {activeTab === 'calendar' && (
             <CalendarTab t={t} locale={locale} />

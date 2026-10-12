@@ -1,4 +1,5 @@
 'use client';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
@@ -209,7 +210,18 @@ function HowItWorks({ t }) {
 
 /* ─── Featured Bikes (Clean Cards) ─── */
 function FeaturedBikes({ t }) {
+  const router = useRouter();
   const featured = bikes.slice(0, 3);
+
+  const handleBikeBook = (bike) => {
+    const isLoggedIn = typeof window !== 'undefined' && localStorage.getItem('isMember');
+    if (isLoggedIn) {
+      router.push(`/member?bookBike=${bike.id}`);
+    } else {
+      router.push(`/login?bookBike=${bike.id}&redirect=/member`);
+    }
+  };
+
   return (
     <section className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -220,7 +232,7 @@ function FeaturedBikes({ t }) {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {featured.map(bike => (
-            <div key={bike.id} className="clean-card group cursor-pointer flex flex-col">
+            <div key={bike.id} className="clean-card group cursor-pointer flex flex-col" onClick={() => handleBikeBook(bike)}>
               <div className="relative h-48 bg-gray-50 p-6 flex items-center justify-center">
                 <Image 
                   src={bike.image} 
@@ -243,9 +255,12 @@ function FeaturedBikes({ t }) {
                     <span className="text-[9px] text-gray-400 block">Mulai dari</span>
                     <span className="text-xl font-black text-gray-900">{formatCurrency(getLowestPrice(bike))}</span>
                   </div>
-                  <Link href="/unit-sepeda" className="w-10 h-10 rounded-full bg-[var(--color-primary-soft)] text-[var(--color-primary)] flex items-center justify-center hover:bg-[var(--color-primary)] hover:text-white transition-colors">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleBikeBook(bike); }}
+                    className="w-10 h-10 rounded-full bg-[var(--color-primary-soft)] text-[var(--color-primary)] flex items-center justify-center hover:bg-[var(--color-primary)] hover:text-white transition-colors cursor-pointer"
+                  >
                     <Plus size={20} />
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>

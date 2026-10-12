@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { I18nProvider } from '@/lib/i18n';
-import { LayoutDashboard, CalendarDays, Bike, Users, FileText, LogOut, ShieldAlert, RotateCcw, Map, Shield } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bike, Users, FileText, LogOut, ShieldAlert, RotateCcw, Map, Shield, Navigation2 } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
@@ -45,6 +45,7 @@ export default function AdminLayout({ children }) {
     { href: '/admin/partners', label: 'Partners', icon: <Users size={20} /> },
     { href: '/admin/articles', label: 'Articles', icon: <FileText size={20} /> },
     { href: '/admin/tours', label: 'Tours & Trips', icon: <Map size={20} /> },
+    { href: '/admin/routes', label: 'Rute Gowes', icon: <Navigation2 size={20} /> },
     { href: '/admin/spin-prizes', label: 'Spin Prizes', icon: <RotateCcw size={20} /> },
   ];
 

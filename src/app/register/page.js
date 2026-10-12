@@ -13,6 +13,16 @@ export default function MemberRegister() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Read bookBike & redirect from URL search params
+  const getMemberRedirect = () => {
+    if (typeof window === 'undefined') return '/member';
+    const params = new URLSearchParams(window.location.search);
+    const bookBike = params.get('bookBike');
+    const redirect = params.get('redirect');
+    const base = redirect || '/member';
+    return bookBike ? `${base}?bookBike=${bookBike}` : base;
+  };
+
   const handleRegister = (e) => {
     e.preventDefault();
     setLoading(true);
@@ -20,7 +30,7 @@ export default function MemberRegister() {
     setTimeout(() => {
       // Simulate successful registration and login
       localStorage.setItem('isMember', 'true');
-      router.push('/member');
+      router.push(getMemberRedirect());
     }, 1000);
   };
 
@@ -28,7 +38,7 @@ export default function MemberRegister() {
     setLoading(true);
     setTimeout(() => {
       localStorage.setItem('isMember', 'true');
-      router.push('/member');
+      router.push(getMemberRedirect());
     }, 1000);
   };
 

@@ -2,17 +2,28 @@
 import { useEffect, useState } from 'react';
 
 export default function VisitorTracker() {
-  const [stats, setStats] = useState({ today: 22, total: 1140 });
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Record visit and get stats
+    // Record real visit and retrieve aggregated visitor stats
     fetch('/api/visitors', { method: 'POST' })
       .then(res => res.json())
       .then(data => {
-        if (data.total) setStats(data);
+        if (typeof data.total === 'number') {
+          setStats(data);
+        }
       })
-      .catch(err => console.error(err));
+      .catch(err => {
+        console.error('Visitor tracker error:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
+
+  const todayCount = stats ? stats.today.toLocaleString() : '0';
+  const totalCount = stats ? stats.total.toLocaleString() : '0';
 
   return (
     <section className="py-12 bg-[#F6FAFE]">
@@ -27,13 +38,24 @@ export default function VisitorTracker() {
         </div>
 
         <div className="flex gap-4 w-full md:w-auto">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex-1 md:w-48">
+          {/* Card Hari Ini */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex-1 md:w-48 transition-all">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-4">Hari Ini</p>
-            <p className="font-display font-black text-3xl text-[#2B639B]">{stats.today.toLocaleString()}</p>
+            {loading ? (
+              <div className="h-9 w-20 bg-gray-200 animate-pulse rounded-lg" />
+            ) : (
+              <p className="font-display font-black text-3xl text-[#2B639B]">{todayCount}</p>
+            )}
           </div>
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex-1 md:w-48">
+
+          {/* Card Total Pengunjung */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex-1 md:w-48 transition-all">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-4">Total Pengunjung</p>
-            <p className="font-display font-black text-3xl text-[#2B639B]">{stats.total.toLocaleString()}</p>
+            {loading ? (
+              <div className="h-9 w-24 bg-gray-200 animate-pulse rounded-lg" />
+            ) : (
+              <p className="font-display font-black text-3xl text-[#2B639B]">{totalCount}</p>
+            )}
           </div>
         </div>
       </div>
