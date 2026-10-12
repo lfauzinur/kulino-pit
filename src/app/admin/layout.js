@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { I18nProvider } from '@/lib/i18n';
 import { LayoutDashboard, CalendarDays, Bike, Users, FileText, LogOut, ShieldAlert, RotateCcw, Map, Shield, Navigation2 } from 'lucide-react';
@@ -56,11 +57,16 @@ export default function AdminLayout({ children }) {
         <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-100 flex-shrink-0 z-10 sticky top-0 md:h-screen overflow-y-auto">
           <div className="p-6">
             <Link href="/" className="flex items-center gap-3 group">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white font-display font-black text-xl shadow-md">
-                K
-              </span>
+              <div className="relative w-10 h-10 transition-transform group-hover:scale-105">
+                <Image 
+                  src="/images/logo.png" 
+                  alt="Kulino Ngepit Logo" 
+                  fill 
+                  className="object-contain" 
+                />
+              </div>
               <div>
-                <strong className="block font-display text-base font-black leading-none text-gray-900">Kulino Pit CMS</strong>
+                <strong className="block font-display text-base font-black leading-none text-gray-900 group-hover:text-[var(--color-primary)] transition-colors">Kulino Pit CMS</strong>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)]">Admin Portal</span>
               </div>
             </Link>

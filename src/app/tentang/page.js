@@ -46,7 +46,7 @@ export default function TentangPage() {
             {/* Kulino House Building Image */}
             <div className="relative w-full max-w-lg h-full z-10 animate-fade-in-up">
               <Image
-                src="/images/kulino-house.png"
+                src="/images/partners/kulino-house.png"
                 alt="Kulino House"
                 fill
                 className="object-contain object-center drop-shadow-2xl"

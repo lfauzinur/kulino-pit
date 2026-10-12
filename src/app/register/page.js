@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bike, KeyRound, Phone, User } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 
 export default function MemberRegister() {
@@ -45,8 +46,8 @@ export default function MemberRegister() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 mt-10">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--color-primary)] text-white mb-4 shadow-lg">
-          <Bike size={32} />
+        <Link href="/" className="inline-flex items-center justify-center w-20 h-20 mb-3 hover:scale-105 transition-transform">
+          <Image src="/images/logo.png" alt="Kulino Ngepit Logo" width={80} height={80} className="object-contain" priority />
         </Link>
         <h2 className="text-3xl font-display font-black text-gray-900">
           {t('auth.registerTitle')}

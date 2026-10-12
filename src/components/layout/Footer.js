@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 import { MapPin, Phone, Clock } from 'lucide-react';
 
@@ -28,13 +29,18 @@ export default function Footer() {
           
           {/* Brand Info */}
           <div className="md:col-span-1 space-y-4">
-            <Link href="/" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white font-display font-black text-xl">
-                K
-              </span>
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="relative w-12 h-12 transition-transform group-hover:scale-105">
+                <Image 
+                  src="/images/logo.png" 
+                  alt="Kulino Ngepit Logo" 
+                  fill 
+                  className="object-contain" 
+                />
+              </div>
               <div>
-                <strong className="block font-display text-lg font-black leading-none text-gray-900">Kulino Pit</strong>
-                <span className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">By Kulino House</span>
+                <strong className="block font-display text-lg font-black leading-none text-gray-900 group-hover:text-[var(--color-primary)] transition-colors">Kulino Pit</strong>
+                <span className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Ora Usah Spanneng</span>
               </div>
             </Link>
             <p className="text-sm text-gray-600 leading-relaxed">

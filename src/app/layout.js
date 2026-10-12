@@ -6,6 +6,10 @@ export const metadata = {
   description: 'Kulino Pit menyediakan layanan penyewaan sepeda premium, paket trip & tour, dan layanan ekosistem bersepeda. Bagian dari Kulino House.',
   keywords: 'sewa sepeda, bike rental, Banyuwangi, Kulino Pit, Kulino House, cycling, road bike, MTB',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icon-192x192.png',
+    apple: '/icon-192x192.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

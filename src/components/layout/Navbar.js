@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
 
@@ -28,13 +29,19 @@ export default function Navbar() {
           <div className="flex justify-between items-center h-20">
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
-              <Link href="/" className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white font-display font-black text-xl shadow-md">
-                  K
-                </span>
+              <Link href="/" className="flex items-center gap-3 group">
+                <div className="relative w-11 h-11 transition-transform group-hover:scale-105">
+                  <Image 
+                    src="/images/logo.png" 
+                    alt="Kulino Ngepit Logo" 
+                    fill 
+                    className="object-contain" 
+                    priority 
+                  />
+                </div>
                 <div className="hidden sm:block">
-                  <strong className="block font-display text-lg font-black leading-none text-gray-900">Kulino Pit</strong>
-                  <span className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Premium Bike Rental</span>
+                  <strong className="block font-display text-lg font-black leading-none text-gray-900 group-hover:text-[var(--color-primary)] transition-colors">Kulino Pit</strong>
+                  <span className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Ora Usah Spanneng</span>
                 </div>
               </Link>
             </div>

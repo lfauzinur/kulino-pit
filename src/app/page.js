@@ -104,14 +104,15 @@ function AboutSection({ t }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           
-          <div className="relative bg-[var(--color-primary-soft)] rounded-[3rem] p-8 lg:p-12 h-[300px] sm:h-[400px]">
-            {/* Kulino House Building Image */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[120%] h-[120%] z-10 animate-fade-in-up">
+          <div className="relative bg-[var(--color-primary-soft)] rounded-[3rem] p-8 lg:p-12 h-[320px] sm:h-[420px] flex items-center justify-center overflow-hidden">
+            {/* Kulino Mascot Image */}
+            <div className="relative w-full h-full max-w-[360px] animate-fade-in-up">
               <Image
-                src="/images/kulino-house.png"
-                alt="Kulino House"
+                src="/images/mascot.png"
+                alt="Maskot Kulino Ngepit"
                 fill
-                className="object-contain object-bottom drop-shadow-2xl"
+                className="object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+                priority
               />
             </div>
           </div>
