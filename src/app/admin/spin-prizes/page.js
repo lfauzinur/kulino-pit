@@ -3,17 +3,17 @@ import { useState, useEffect } from 'react';
 import { RotateCcw, Gift, Plus, Trash2, Save, Palette } from 'lucide-react';
 
 const DEFAULT_PRIZES = [
-  { label: 'Diskon 10%', color: '#3B82F6', chance: 25 },
-  { label: 'Gratis Helm', color: '#10B981', chance: 15 },
-  { label: 'Voucher 50K', color: '#F59E0B', chance: 20 },
-  { label: 'Coba Lagi', color: '#EF4444', chance: 25 },
-  { label: 'Gratis 1 Jam', color: '#8B5CF6', chance: 10 },
-  { label: 'Merchandise', color: '#EC4899', chance: 5 },
+  { label: 'Diskon 10%', color: '#0284C7', chance: 25 },    // Kulino Sky Blue
+  { label: 'Gratis Helm', color: '#0D9488', chance: 15 },   // Ocean Teal
+  { label: 'Voucher 50K', color: '#D97706', chance: 20 },   // Warm Amber
+  { label: 'Coba Lagi', color: '#475569', chance: 25 },     // Slate Cool Neutral
+  { label: 'Gratis 1 Jam', color: '#2563EB', chance: 10 },  // Primary Deep Blue
+  { label: 'Jersey Kulino', color: '#059669', chance: 5 },  // Forest Emerald
 ];
 
 const COLOR_PRESETS = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
-  '#EC4899', '#06B6D4', '#F97316', '#14B8A6', '#6366F1',
+  '#0284C7', '#0D9488', '#D97706', '#475569', '#2563EB', 
+  '#059669', '#0891B2', '#0369A1', '#0F766E', '#334155',
 ];
 
 export default function AdminSpinPrizesPage() {
@@ -21,18 +21,22 @@ export default function AdminSpinPrizesPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('spinPrizes');
+    const stored = localStorage.getItem('spinPrizes_v2') || localStorage.getItem('spinPrizes');
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length >= 2) {
-          setPrizes(parsed);
+          const hasLegacyColors = parsed.some(p => p.color === '#EF4444' || p.color === '#EC4899' || p.color === '#8B5CF6');
+          if (!hasLegacyColors) {
+            setPrizes(parsed);
+          }
         }
       } catch (e) { /* use defaults */ }
     }
   }, []);
 
   const handleSave = () => {
+    localStorage.setItem('spinPrizes_v2', JSON.stringify(prizes));
     localStorage.setItem('spinPrizes', JSON.stringify(prizes));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -40,6 +44,7 @@ export default function AdminSpinPrizesPage() {
 
   const handleReset = () => {
     setPrizes(DEFAULT_PRIZES);
+    localStorage.setItem('spinPrizes_v2', JSON.stringify(DEFAULT_PRIZES));
     localStorage.setItem('spinPrizes', JSON.stringify(DEFAULT_PRIZES));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

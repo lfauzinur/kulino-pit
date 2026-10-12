@@ -225,10 +225,10 @@ export const memberData = {
     { id: 'BK003', bike: 'Specialized Vado SL', date: '2026-10-05', duration: '3 hari', total: 1050000, status: 'upcoming', points: 0 },
   ],
   rewards: [
-    { id: 1, name: { id: 'Diskon 10% Booking', en: '10% Booking Discount' }, cost: 100, icon: '🏷️' },
-    { id: 2, name: { id: 'Free Helm MTB', en: 'Free MTB Helmet' }, cost: 200, icon: '🪖' },
-    { id: 3, name: { id: 'Kaos Kulino Pit', en: 'Kulino Pit T-Shirt' }, cost: 500, icon: '👕' },
-    { id: 4, name: { id: 'Free Half-Day Tour', en: 'Free Half-Day Tour' }, cost: 1000, icon: '🚴' },
+    { id: 1, name: { id: 'Diskon 10% Booking', en: '10% Booking Discount' }, cost: 100, iconType: 'discount' },
+    { id: 2, name: { id: 'Free Helm MTB', en: 'Free MTB Helmet' }, cost: 200, iconType: 'helmet' },
+    { id: 3, name: { id: 'Kaos Kulino Pit', en: 'Kulino Pit T-Shirt' }, cost: 500, iconType: 'shirt' },
+    { id: 4, name: { id: 'Free Half-Day Tour', en: 'Free Half-Day Tour' }, cost: 1000, iconType: 'tour' },
   ],
 };
 

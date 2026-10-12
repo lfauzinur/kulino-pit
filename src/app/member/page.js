@@ -15,7 +15,7 @@ import {
   Map as MapIcon, MousePointerClick, Users, CreditCard, LogOut,
   Share2, Link2, RotateCcw, Gift, AlertTriangle, ChevronRight,
   Sparkles, Compass, ArrowUpRight, Flame, Home, QrCode, ArrowLeft, Download, ShieldCheck,
-  Navigation2, Route, History, Play, Square, Timer
+  Navigation2, Route, History, Play, Square, Timer, Tag, HardHat, Shirt
 } from 'lucide-react';
 
 /* ─── Active Booking Countdown Timer ─── */
@@ -1328,6 +1328,36 @@ const DEFAULT_CYCLING_ROUTES = [
   },
 ];
 
+function getRewardIcon(reward) {
+  switch (reward.id) {
+    case 1:
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center flex-shrink-0 text-sky-600 shadow-sm">
+          <Tag size={19} />
+        </div>
+      );
+    case 2:
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center flex-shrink-0 text-teal-600 shadow-sm">
+          <HardHat size={19} />
+        </div>
+      );
+    case 3:
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600 shadow-sm">
+          <Shirt size={19} />
+        </div>
+      );
+    case 4:
+    default:
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0 text-amber-600 shadow-sm">
+          <Bike size={19} />
+        </div>
+      );
+  }
+}
+
 /* ─── Spin Wheel & Points Tab ─── */
 function SpinWheelAndPointsTab({ t, locale }) {
   const canvasRef = useRef(null);
@@ -1338,18 +1368,18 @@ function SpinWheelAndPointsTab({ t, locale }) {
   const userPoints = memberData.points;
 
   const defaultPrizes = [
-    { label: 'Diskon 10%', color: '#3B82F6', chance: 25 },
-    { label: 'Gratis Helm', color: '#10B981', chance: 15 },
-    { label: 'Voucher 50K', color: '#F59E0B', chance: 20 },
-    { label: 'Coba Lagi', color: '#EF4444', chance: 25 },
-    { label: 'Gratis 1 Jam', color: '#8B5CF6', chance: 10 },
-    { label: 'Jersey Kulino', color: '#EC4899', chance: 5 },
+    { label: 'Diskon 10%', color: '#0284C7', chance: 25 },    // Kulino Sky Blue
+    { label: 'Gratis Helm', color: '#0D9488', chance: 15 },   // Ocean Teal
+    { label: 'Voucher 50K', color: '#D97706', chance: 20 },   // Warm Amber
+    { label: 'Coba Lagi', color: '#475569', chance: 25 },     // Slate Cool Neutral
+    { label: 'Gratis 1 Jam', color: '#2563EB', chance: 10 },  // Primary Deep Blue
+    { label: 'Jersey Kulino', color: '#059669', chance: 5 },  // Forest Emerald
   ];
 
   const [prizes, setPrizes] = useState(defaultPrizes);
 
   useEffect(() => {
-    const stored = localStorage.getItem('spinPrizes');
+    const stored = localStorage.getItem('spinPrizes_v2');
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
@@ -1357,6 +1387,22 @@ function SpinWheelAndPointsTab({ t, locale }) {
           setTimeout(() => {
             setPrizes(parsed);
           }, 0);
+          return;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    const legacyStored = localStorage.getItem('spinPrizes');
+    if (legacyStored) {
+      try {
+        const parsed = JSON.parse(legacyStored);
+        if (Array.isArray(parsed) && parsed.length >= 2) {
+          const hasLegacyColors = parsed.some(p => p.color === '#EF4444' || p.color === '#EC4899' || p.color === '#8B5CF6');
+          if (!hasLegacyColors) {
+            setTimeout(() => {
+              setPrizes(parsed);
+            }, 0);
+            return;
+          }
         }
       } catch (e) { /* ignore */ }
     }
@@ -1385,40 +1431,63 @@ function SpinWheelAndPointsTab({ t, locale }) {
       ctx.closePath();
       ctx.fillStyle = prize.color;
       ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
       ctx.save();
       ctx.rotate(startAngle + sliceAngle / 2);
       ctx.textAlign = 'right';
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 12px system-ui';
-      ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = 3;
-      ctx.fillText(prize.label, r - 18, 5);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(prize.label, r - 18, 4);
       ctx.restore();
     });
 
     ctx.restore();
 
-    // Center pin
+    // Elegant Outer Rim Border
     ctx.beginPath();
-    ctx.arc(cx, cy, 22, 0, 2 * Math.PI);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 2;
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Arrow pointer at top
+    // Center pin with metallic/slate ring
     ctx.beginPath();
-    ctx.moveTo(cx - 12, 6);
-    ctx.lineTo(cx + 12, 6);
-    ctx.lineTo(cx, 28);
+    ctx.arc(cx, cy, 26, 0, 2 * Math.PI);
+    ctx.fillStyle = '#0F172A';
+    ctx.fill();
+    ctx.strokeStyle = '#38BDF8';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Inner center circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, 20, 0, 2 * Math.PI);
+    ctx.fillStyle = '#0284C7';
+    ctx.fill();
+
+    // Center 'SPIN' text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 10px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SPIN', cx, cy);
+
+    // Arrow pointer at top with sleek styling
+    ctx.beginPath();
+    ctx.moveTo(cx - 11, 7);
+    ctx.lineTo(cx + 11, 7);
+    ctx.lineTo(cx, 27);
     ctx.closePath();
     ctx.fillStyle = '#0F172A';
     ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }, [prizes]);
 
   useEffect(() => {
@@ -1484,34 +1553,34 @@ function SpinWheelAndPointsTab({ t, locale }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-[28px] p-6 bg-gradient-to-r from-purple-700 via-indigo-600 to-sky-600 text-white shadow-lg flex items-center justify-between flex-wrap gap-4">
+      <div className="rounded-[28px] p-6 bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white shadow-lg border border-sky-500/20 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="font-display font-black text-xl flex items-center gap-2">
-            <RotateCcw size={22} /> Spin & Win Lucky Wheel
+            <RotateCcw size={22} className="text-sky-400" /> Spin & Win Lucky Wheel
           </h2>
-          <p className="text-xs text-white/80 mt-1">
+          <p className="text-xs text-slate-300 mt-1">
             Biaya 100 poin per putaran • Saldo Anda: {userPoints.toLocaleString()} pts
           </p>
         </div>
-        <div className="px-3.5 py-1.5 rounded-full bg-white/20 border border-white/30 text-xs font-bold flex items-center gap-1.5">
-          <Trophy size={14} className="text-amber-300" /> {userPoints.toLocaleString()} pts
+        <div className="px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-bold flex items-center gap-1.5 backdrop-blur-sm">
+          <Trophy size={14} className="text-amber-400" /> {userPoints.toLocaleString()} pts
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Canvas Wheel */}
-        <div className="lg:col-span-3 bg-white rounded-[26px] p-6 shadow-sm border border-gray-100 flex flex-col items-center">
+        <div className="lg:col-span-3 bg-white rounded-[26px] p-6 shadow-sm border border-slate-100 flex flex-col items-center">
           <div className="relative w-[300px] h-[300px] mb-5">
             <canvas ref={canvasRef} style={{ width: 300, height: 300 }} />
             <button
               onClick={handleSpin}
               disabled={isSpinning || userPoints < SPIN_COST}
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full font-black text-xs z-10 transition-all ${
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full font-black text-xs z-10 transition-all flex items-center justify-center border-2 border-white shadow-xl ${
                 isSpinning
-                  ? 'bg-gray-300 text-gray-500 cursor-wait'
+                  ? 'bg-slate-700 text-slate-400 cursor-wait'
                   : userPoints < SPIN_COST
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-[var(--color-primary)] text-white hover:scale-110 shadow-lg cursor-pointer'
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-br from-sky-500 to-sky-600 text-white hover:scale-110 cursor-pointer shadow-sky-500/30'
               }`}
             >
               {isSpinning ? '...' : 'SPIN'}
@@ -1525,7 +1594,7 @@ function SpinWheelAndPointsTab({ t, locale }) {
               isSpinning 
                 ? 'bg-gray-300 text-gray-500 cursor-wait' 
                 : userPoints < SPIN_COST 
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
                   : 'btn-primary shadow-md'
             }`}
           >
@@ -1545,24 +1614,26 @@ function SpinWheelAndPointsTab({ t, locale }) {
 
         {/* Rewards Catalog */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white rounded-[26px] p-5 shadow-sm border border-gray-100">
-            <h3 className="font-display font-black text-xs text-gray-900 mb-3 flex items-center gap-2">
+          <div className="bg-white rounded-[26px] p-5 shadow-sm border border-slate-100">
+            <h3 className="font-display font-black text-xs text-slate-900 mb-3 flex items-center gap-2">
               <Award size={15} className="text-amber-500" /> Katalog Penukaran Poin
             </h3>
             <div className="space-y-2.5">
               {memberData.rewards.map(reward => (
-                <div key={reward.id} className="p-3 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl">{reward.icon}</span>
+                <div key={reward.id} className="p-3.5 rounded-2xl bg-slate-50/70 hover:bg-slate-50 border border-slate-100 flex items-center justify-between gap-3 transition-colors">
+                  <div className="flex items-center gap-3">
+                    {getRewardIcon(reward)}
                     <div>
-                      <p className="font-display font-bold text-xs text-gray-900">{reward.name[locale] || reward.name.id}</p>
-                      <p className="text-[10px] text-[var(--color-primary)] font-bold">{reward.cost} Pts</p>
+                      <p className="font-display font-bold text-xs text-slate-900">{reward.name[locale] || reward.name.id}</p>
+                      <p className="text-[11px] text-[var(--color-primary)] font-black mt-0.5">{reward.cost.toLocaleString()} Pts</p>
                     </div>
                   </div>
                   <button
                     disabled={userPoints < reward.cost}
-                    className={`btn px-3 py-1.5 text-[10px] font-bold cursor-pointer ${
-                      userPoints >= reward.cost ? 'btn-primary' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    className={`btn px-3.5 py-1.5 text-[11px] font-bold rounded-xl cursor-pointer transition-all ${
+                      userPoints >= reward.cost 
+                        ? 'btn-primary shadow-sm hover:shadow' 
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                     }`}
                   >
                     Tukar
@@ -1739,14 +1810,14 @@ export default function MemberPage() {
         {/* Top Floating App Bar */}
         <div className="absolute top-0 left-0 right-0 p-5 sm:p-6 z-10 flex justify-between items-center pt-6 sm:pt-8">
           <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1.5 border border-white/15 transition-colors"
-              title="Kembali ke Website Utama"
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white text-[11px] font-bold flex items-center gap-1.5 border border-white/15 transition-colors cursor-pointer"
+              title="Dashboard Member"
             >
-              <ArrowLeft size={13} />
-              <span>Ke Web</span>
-            </Link>
+              <Home size={13} className="text-sky-400" />
+              <span>Dashboard Member</span>
+            </button>
             
             {/* Gambar 2: Badge MEMBER PWA senada tema */}
             <span className="px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30 backdrop-blur-sm text-[10px] font-black tracking-wider uppercase">
