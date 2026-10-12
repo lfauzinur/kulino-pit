@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
+import { neon } from '@neondatabase/serverless';
 
-// In-memory persistent cache for serverless environments
-let memoryStore = {
-  total: 0,
-  days: {}, // { '2026-10-12': ['iphash1', 'iphash2'] }
-  seenIps: {} // { 'iphash1': '2026-10-12' }
-};
+export const dynamic = 'force-dynamic';
 
-const dataDir = path.join(process.cwd(), 'data');
-const dataFile = path.join(dataDir, 'visitors.json');
+function getDb() {
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!url) return null;
+  return neon(url);
+}
 
 // Helper to get today's date in WIB (Asia/Jakarta, GMT+7)
 function getTodayDateWIB() {
@@ -22,95 +19,123 @@ function getTodayDateWIB() {
   }
 }
 
-// Anonymize IP to comply with "tanpa menyimpan alamat IP asli"
+// Anonymize IP via SHA-256 (no raw IP stored, strictly 1 IP/day logic)
 function hashIp(ip) {
   const salt = 'kulino_pit_wib_salt_2026';
   return crypto.createHash('sha256').update((ip || '127.0.0.1') + salt).digest('hex').substring(0, 16);
 }
 
-// Helper to safely load data
-function loadVisitorData() {
-  try {
-    if (fs.existsSync(dataFile)) {
-      const raw = fs.readFileSync(dataFile, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.total === 'number') {
-        memoryStore.total = parsed.total;
-        memoryStore.days = parsed.days || {};
-        memoryStore.seenIps = parsed.seenIps || parsed.ips || {};
-      }
-    }
-  } catch (err) {
-    // If filesystem is not writable or error, memoryStore retains state
-  }
-  return memoryStore;
+// In-memory fallback if database is temporarily unreachable
+let memoryStore = {
+  total: 0,
+  days: {},
+  seenIps: {}
+};
+
+async function ensureTable(sql) {
+  await sql`
+    CREATE TABLE IF NOT EXISTS kulino_visitors (
+      ip_hash VARCHAR(64) NOT NULL,
+      visit_date DATE NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (ip_hash, visit_date)
+    );
+  `;
 }
 
-// Helper to safely persist data
-function saveVisitorData(data) {
-  memoryStore = data;
-  try {
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), 'utf8');
-  } catch (err) {
-    // Graceful fallback for read-only environments
-  }
-}
-
-// GET: Read current visitor stats without incrementing
+// GET: Read current real visitor stats without incrementing
 export async function GET() {
-  try {
-    const data = loadVisitorData();
-    const today = getTodayDateWIB();
-    const todayCount = (data.days && data.days[today]) ? data.days[today].length : 0;
-    
-    return NextResponse.json({
-      total: data.total,
-      today: todayCount,
-      date: today
-    });
-  } catch (error) {
-    return NextResponse.json({ total: 0, today: 0, error: error.message }, { status: 500 });
+  const today = getTodayDateWIB();
+  const sql = getDb();
+
+  if (sql) {
+    try {
+      await ensureTable(sql);
+      const [todayResult, totalResult] = await Promise.all([
+        sql`SELECT COUNT(*)::int AS count FROM kulino_visitors WHERE visit_date = ${today}::date`,
+        sql`SELECT COUNT(*)::int AS count FROM kulino_visitors`
+      ]);
+
+      return NextResponse.json({
+        total: totalResult[0]?.count || 0,
+        today: todayResult[0]?.count || 0,
+        date: today
+      });
+    } catch (dbErr) {
+      console.error('Database GET error, falling back:', dbErr);
+    }
   }
+
+  // Fallback to memoryStore
+  const todayCount = (memoryStore.days && memoryStore.days[today]) ? memoryStore.days[today].length : 0;
+  return NextResponse.json({
+    total: memoryStore.total,
+    today: todayCount,
+    date: today
+  });
 }
 
-// POST: Record visit (Counts max 1 IP per day)
+// POST: Record real visit (strictly 1 IP per day)
 export async function POST(req) {
   try {
-    // 1. Get Real IP from Request Headers
+    // 1. Extract Real IP from request headers
     const forwarded = req.headers.get('x-forwarded-for');
     const realIp = req.headers.get('x-real-ip');
     const cfIp = req.headers.get('cf-connecting-ip');
     const rawIp = forwarded ? forwarded.split(',')[0].trim() : (realIp || cfIp || '127.0.0.1');
 
-    // 2. Anonymize IP via SHA-256 hash
+    // 2. Anonymize IP
     const ipHash = hashIp(rawIp);
     const today = getTodayDateWIB();
+    const sql = getDb();
 
-    // 3. Load latest data
-    const data = loadVisitorData();
-    if (!data.days) data.days = {};
-    if (!data.seenIps) data.seenIps = {};
-    if (!Array.isArray(data.days[today])) data.days[today] = [];
+    if (sql) {
+      try {
+        await ensureTable(sql);
 
-    // 4. Check if this IP has already been counted today
-    const lastSeenDate = data.seenIps[ipHash];
+        // 3. Insert if not exists for today (ON CONFLICT DO NOTHING guarantees max 1 IP per day)
+        const insertResult = await sql`
+          INSERT INTO kulino_visitors (ip_hash, visit_date)
+          VALUES (${ipHash}, ${today}::date)
+          ON CONFLICT (ip_hash, visit_date) DO NOTHING
+          RETURNING ip_hash;
+        `;
+        const isNewVisitToday = insertResult.length > 0;
+
+        // 4. Fetch real accurate counts
+        const [todayResult, totalResult] = await Promise.all([
+          sql`SELECT COUNT(*)::int AS count FROM kulino_visitors WHERE visit_date = ${today}::date`,
+          sql`SELECT COUNT(*)::int AS count FROM kulino_visitors`
+        ]);
+
+        return NextResponse.json({
+          total: totalResult[0]?.count || 0,
+          today: todayResult[0]?.count || 0,
+          isNewVisitToday,
+          date: today
+        });
+      } catch (dbErr) {
+        console.error('Database POST error, falling back:', dbErr);
+      }
+    }
+
+    // Fallback if DB is not available
+    if (!memoryStore.days) memoryStore.days = {};
+    if (!memoryStore.seenIps) memoryStore.seenIps = {};
+    if (!Array.isArray(memoryStore.days[today])) memoryStore.days[today] = [];
+
+    const lastSeenDate = memoryStore.seenIps[ipHash];
     const isNewVisitorToday = lastSeenDate !== today;
 
     if (isNewVisitorToday) {
-      data.seenIps[ipHash] = today;
-      data.days[today].push(ipHash);
-      data.total = (data.total || 0) + 1;
-      saveVisitorData(data);
+      memoryStore.seenIps[ipHash] = today;
+      memoryStore.days[today].push(ipHash);
+      memoryStore.total = (memoryStore.total || 0) + 1;
     }
 
-    const todayCount = data.days[today].length;
-
     return NextResponse.json({
-      total: data.total,
-      today: todayCount,
+      total: memoryStore.total,
+      today: memoryStore.days[today].length,
       isNewVisitToday: isNewVisitorToday,
       date: today
     });
