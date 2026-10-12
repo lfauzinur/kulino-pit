@@ -1,12 +1,15 @@
 {
-  "name": "Kulino Pit - Premium Bike Rental",
+  "id": "/member",
+  "name": "Kulino Pit — Premium Bike Rental & Tracker",
   "short_name": "Kulino Pit",
-  "description": "Premium bike rental, tours, and services by Kulino House.",
-  "start_url": "/",
+  "description": "Aplikasi rental sepeda premium, GPS ride tracker, paket tour, dan member portal Kulino Pit Banyuwangi.",
+  "start_url": "/member",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#FCF9F2",
-  "theme_color": "#F96435",
-  "orientation": "portrait",
+  "background_color": "#F8FAFC",
+  "theme_color": "#4BA3E3",
+  "orientation": "portrait-primary",
+  "categories": ["sports", "travel", "lifestyle"],
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -20,5 +23,36 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Member Portal",
+      "short_name": "Member",
+      "description": "Buka Dashboard Member Kulino Pit",
+      "url": "/member",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "GPS Ride Tracker",
+      "short_name": "Tracker",
+      "description": "Lacak rute gowes, kecepatan & kalori",
+      "url": "/member?tab=tracker",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Sewa Sepeda",
+      "short_name": "Booking",
+      "description": "Pesan armada sepeda premium",
+      "url": "/booking",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Poin & Spin Wheel",
+      "short_name": "Hadiah",
+      "description": "Putar Spin Wheel & klaim hadiah",
+      "url": "/member?tab=points",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    }
   ]
 }
+
