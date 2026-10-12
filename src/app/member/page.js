@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,6 +10,15 @@ import PWAInstallBanner from '@/components/PWAInstallBanner';
 import CyclingWeatherCard from '@/components/CyclingWeatherCard';
 import InAppBookingModal from '@/components/InAppBookingModal';
 import InAppBikeCatalogModal from '@/components/InAppBikeCatalogModal';
+
+const LiveRouteNavMap = dynamic(() => import('@/components/LiveRouteNavMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[340px] sm:h-[400px] rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 text-xs font-bold animate-pulse">
+      Memuat Peta Navigasi Google Maps & GPS...
+    </div>
+  ),
+});
 import { 
   LayoutDashboard, MapPin, CalendarDays, Award, Link as LinkIcon, 
   Trophy, Bike, DollarSign, Star, CheckCircle, Clock, Info, 
@@ -1101,6 +1111,13 @@ function RuteGowesTab({ t, locale }) {
             </div>
           </div>
         </div>
+
+        {/* Live Google Maps + GPS Navigation Map */}
+        <LiveRouteNavMap
+          route={selectedRoute}
+          userPosition={userPosition}
+          reachedCheckpoints={reachedCheckpoints}
+        />
 
         {/* Controls */}
         <div className="flex gap-3">
