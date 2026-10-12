@@ -7,6 +7,8 @@ import { useI18n } from '@/lib/i18n';
 import { memberData, calendarBookings, bikes, tours, articles, formatCurrency, getLowestPrice } from '@/lib/data';
 import PWAInstallBanner from '@/components/PWAInstallBanner';
 import CyclingWeatherCard from '@/components/CyclingWeatherCard';
+import InAppBookingModal from '@/components/InAppBookingModal';
+import InAppBikeCatalogModal from '@/components/InAppBikeCatalogModal';
 import { 
   LayoutDashboard, MapPin, CalendarDays, Award, Link as LinkIcon, 
   Trophy, Bike, DollarSign, Star, CheckCircle, Clock, Info, 
@@ -60,11 +62,11 @@ function ActiveBookingTimer({ booking, locale, t }) {
   return (
     <div className={`rounded-2xl p-4 mb-5 border ${isExpired ? 'bg-red-50 border-red-200' : isWarning ? 'bg-amber-50 border-amber-200' : 'bg-sky-50 border-sky-200'} flex items-center justify-between gap-4 flex-wrap shadow-sm`}>
       <div className="flex items-center gap-3">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isExpired ? 'bg-red-100 text-red-600' : isWarning ? 'bg-amber-100 text-amber-600' : 'bg-sky-100 text-sky-600'}`}>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${isExpired ? 'bg-red-100 text-red-600' : isWarning ? 'bg-amber-100 text-amber-600' : 'bg-sky-100 text-[var(--color-primary)]'}`}>
           {isWarning || isExpired ? <AlertTriangle size={22} /> : <Clock size={22} />}
         </div>
         <div>
-          <h3 className={`font-display font-black text-sm ${isExpired ? 'text-red-700' : isWarning ? 'text-amber-700' : 'text-sky-800'}`}>
+          <h3 className={`font-display font-black text-sm ${isExpired ? 'text-red-700' : isWarning ? 'text-amber-700' : 'text-sky-900'}`}>
             {isExpired ? (locale === 'id' ? 'Waktu Sewa Habis!' : 'Rental Time Expired!') : (locale === 'id' ? 'Sepeda Sedang Disewa' : 'Bike is Currently Rented')}
           </h3>
           <p className="text-xs text-gray-600 mt-0.5">
@@ -74,7 +76,7 @@ function ActiveBookingTimer({ booking, locale, t }) {
       </div>
       <div className="text-right">
         <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mb-0.5">{locale === 'id' ? 'Sisa Waktu' : 'Time Left'}</p>
-        <p className={`font-display font-black text-2xl tabular-nums ${isExpired ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-sky-600'}`}>
+        <p className={`font-display font-black text-2xl tabular-nums ${isExpired ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-[var(--color-primary)]'}`}>
           {formatTime(timeLeft)}
         </p>
         {isWarning && (
@@ -99,7 +101,7 @@ function DigitalMemberCard({ user, onShowQR }) {
       <div className="relative z-10 flex justify-between items-start">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full bg-amber-400 text-stone-950 flex items-center gap-1 shadow-sm">
+            <span className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1 shadow-sm backdrop-blur-sm">
               <Star size={10} fill="currentColor" /> {user.level || 'GOLD'} VIP
             </span>
             <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">
@@ -147,25 +149,10 @@ function DigitalMemberCard({ user, onShowQR }) {
   );
 }
 
-/* ─── Dashboard Overview Tab (Clean & Professional Sewa Jetski Style) ─── */
-function DashboardOverview({ t, locale, setActiveTab }) {
+/* ─── Dashboard Overview Tab (Harmonious Theme & In-App Booking) ─── */
+function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBikeCatalog, history }) {
   const d = memberData;
-  const [history, setHistory] = useState(d.bookingHistory);
   const [showQRModal, setShowQRModal] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('memberBookings');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setTimeout(() => {
-            setHistory([...parsed, ...d.bookingHistory]);
-          }, 0);
-        }
-      } catch (e) { /* ignore */ }
-    }
-  }, [d.bookingHistory]);
 
   const promos = [
     {
@@ -175,7 +162,7 @@ function DashboardOverview({ t, locale, setActiveTab }) {
       subtitle: 'Semua Road Bike & MTB',
       desc: 'Berlaku setiap Sabtu & Minggu untuk booking minimal 4 jam.',
       bg: 'bg-gradient-to-br from-blue-600 to-sky-700 text-white',
-      accent: 'bg-white/20',
+      bikeId: 1,
     },
     {
       id: 2,
@@ -183,8 +170,8 @@ function DashboardOverview({ t, locale, setActiveTab }) {
       title: 'GRATIS 1 JAM\nSEWA SEPEDA',
       subtitle: 'Klaim Poin Member',
       desc: 'Tukarkan 100 poin member untuk 1 jam gowes gratis kapan saja.',
-      bg: 'bg-gradient-to-br from-orange-500 to-amber-600 text-white',
-      accent: 'bg-white/20',
+      bg: 'bg-gradient-to-br from-sky-600 to-blue-800 text-white',
+      bikeId: 3,
     },
     {
       id: 3,
@@ -192,71 +179,64 @@ function DashboardOverview({ t, locale, setActiveTab }) {
       title: 'SUNRISE TRIP\nIJEN VIBES',
       subtitle: 'Paket Tour Pagi',
       desc: 'Termasuk Road Captain, helm premium, foto drone, dan snack.',
-      bg: 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white',
-      accent: 'bg-white/20',
+      bg: 'bg-gradient-to-br from-slate-800 to-slate-900 text-white',
+      bikeId: 2,
     },
   ];
 
+  /* Gambar 1: Icon SENADA dengan UI Kulino Pit (Semua menggunakan bg-sky-50 text-[var(--color-primary)]) */
   const quickFeatures = [
     { 
       name: 'Ride Tracker', 
       desc: 'GPS & Kalori',
       icon: <Compass size={22} className="text-[var(--color-primary)]" />, 
       action: () => setActiveTab('tracker'), 
-      bg: 'bg-sky-50 text-sky-700 hover:bg-sky-100' 
     },
     { 
       name: 'Sewa Sepeda', 
       desc: 'Armada Unit',
-      icon: <Bike size={22} className="text-orange-500" />, 
-      href: '/booking', 
-      bg: 'bg-orange-50 text-orange-700 hover:bg-orange-100' 
+      icon: <Bike size={22} className="text-[var(--color-primary)]" />, 
+      action: () => onOpenBikeCatalog(), // In-App Bike Picker (tidak lempar ke landing page)
     },
     { 
       name: 'Spin Wheel', 
       desc: 'Putar Hadiah',
-      icon: <RotateCcw size={22} className="text-purple-600" />, 
+      icon: <RotateCcw size={22} className="text-[var(--color-primary)]" />, 
       action: () => setActiveTab('points'), 
-      bg: 'bg-purple-50 text-purple-700 hover:bg-purple-100' 
     },
     { 
       name: 'Jadwal Sewa', 
       desc: 'Kalender Unit',
-      icon: <CalendarDays size={22} className="text-blue-600" />, 
+      icon: <CalendarDays size={22} className="text-[var(--color-primary)]" />, 
       action: () => setActiveTab('calendar'), 
-      bg: 'bg-blue-50 text-blue-700 hover:bg-blue-100' 
     },
     { 
       name: 'Tukar Poin', 
       desc: 'Katalog Reward',
-      icon: <Award size={22} className="text-amber-500" />, 
+      icon: <Award size={22} className="text-[var(--color-primary)]" />, 
       action: () => setActiveTab('points'), 
-      bg: 'bg-amber-50 text-amber-700 hover:bg-amber-100' 
     },
     { 
       name: 'Komisi Ajak', 
       desc: 'Referral Cuan',
-      icon: <DollarSign size={22} className="text-emerald-600" />, 
+      icon: <DollarSign size={22} className="text-[var(--color-primary)]" />, 
       action: () => setActiveTab('referral'), 
-      bg: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' 
     },
     { 
       name: 'Rute Gowes', 
       desc: 'Jalur Pilihan',
-      icon: <MapIcon size={22} className="text-teal-600" />, 
-      href: '/routes', 
-      bg: 'bg-teal-50 text-teal-700 hover:bg-teal-100' 
+      icon: <MapIcon size={22} className="text-[var(--color-primary)]" />, 
+      action: () => setActiveTab('tracker'), 
     },
     { 
       name: 'Pasang PWA', 
       desc: 'Aplikasi HP',
-      icon: <Download size={22} className="text-indigo-600" />, 
+      icon: <Download size={22} className="text-[var(--color-primary)]" />, 
       action: () => {
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('open-pwa-install'));
         }
       }, 
-      bg: 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' 
     },
   ];
 
@@ -268,10 +248,12 @@ function DashboardOverview({ t, locale, setActiveTab }) {
         <ActiveBookingTimer key={booking.id} booking={booking} locale={locale} t={t} />
       ))}
 
-      {/* Floating Stats Card (Overlapping Hero Style) */}
+      {/* Gambar 3: Floating Stats Card SENADA dengan UI (Semua card senada biru-lembut Kulino Pit) */}
       <div className="bg-white rounded-[26px] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-gray-100">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
-          <div className="p-3.5 rounded-2xl bg-sky-50/70 border border-sky-100/60">
+          
+          {/* Stat 1: Total Pemesanan */}
+          <div className="p-3.5 rounded-2xl bg-sky-50/60 border border-sky-100/80 hover:bg-sky-50 transition-colors">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{t('member.totalBookings')}</span>
               <Bike size={18} className="text-[var(--color-primary)]" />
@@ -281,33 +263,36 @@ function DashboardOverview({ t, locale, setActiveTab }) {
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-100/60">
+          {/* Stat 2: Total Poin */}
+          <div className="p-3.5 rounded-2xl bg-sky-50/60 border border-sky-100/80 hover:bg-sky-50 transition-colors">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{t('member.totalPoints')}</span>
-              <Trophy size={18} className="text-amber-500" />
+              <Trophy size={18} className="text-[var(--color-primary)]" />
             </div>
             <p className="font-display font-black text-xl text-gray-900 leading-none">
               {d.points.toLocaleString()} <span className="text-[10px] font-bold text-gray-400">pts</span>
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-100/60">
+          {/* Stat 3: Komisi Teman */}
+          <div className="p-3.5 rounded-2xl bg-sky-50/60 border border-sky-100/80 hover:bg-sky-50 transition-colors">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Komisi Teman</span>
-              <DollarSign size={18} className="text-emerald-500" />
+              <DollarSign size={18} className="text-[var(--color-primary)]" />
             </div>
             <p className="font-display font-black text-lg text-gray-900 leading-none truncate">
               {formatCurrency(d.referralStats.earnings)}
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-100/60">
+          {/* Stat 4: Level Member */}
+          <div className="p-3.5 rounded-2xl bg-sky-50/60 border border-sky-100/80 hover:bg-sky-50 transition-colors">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Level Member</span>
-              <Star size={18} className="text-purple-500" />
+              <Star size={18} className="text-[var(--color-primary)]" />
             </div>
-            <p className="font-display font-black text-base text-purple-900 leading-none flex items-center gap-1">
-              {d.level} <span className="text-[10px] text-purple-600 font-bold">⭐⭐⭐</span>
+            <p className="font-display font-black text-base text-gray-900 leading-none flex items-center gap-1">
+              {d.level} <span className="text-[10px] text-[var(--color-primary)] font-bold">⭐⭐⭐</span>
             </p>
           </div>
         </div>
@@ -315,7 +300,7 @@ function DashboardOverview({ t, locale, setActiveTab }) {
         {/* Quick Link to Bookings or Schedule */}
         <button
           onClick={() => setActiveTab('calendar')}
-          className="w-full bg-[#F8FAFC] hover:bg-sky-50 rounded-2xl p-3.5 flex justify-between items-center transition-colors group border border-gray-100"
+          className="w-full bg-[#F8FAFC] hover:bg-sky-50 rounded-2xl p-3.5 flex justify-between items-center transition-colors group border border-gray-100 cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-white shadow-xs flex items-center justify-center text-[var(--color-primary)]">
@@ -336,7 +321,7 @@ function DashboardOverview({ t, locale, setActiveTab }) {
       {/* Digital Member Card */}
       <DigitalMemberCard user={d} onShowQR={() => setShowQRModal(true)} />
 
-      {/* JELAJAHI: Feature Shortcut Grid (Sewa Jetski Style) */}
+      {/* Gambar 1: JELAJAHI 8 Menu Cepat (Semua icon senada & harmonis dengan UI) */}
       <div>
         <div className="flex justify-between items-end mb-3.5 px-1">
           <div>
@@ -347,41 +332,34 @@ function DashboardOverview({ t, locale, setActiveTab }) {
         </div>
 
         <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
-          {quickFeatures.map((item, idx) => {
-            const content = (
-              <div className="flex flex-col items-center p-3 rounded-2xl bg-white border border-gray-100 hover:border-sky-200 shadow-xs hover:shadow-md transition-all group cursor-pointer text-center h-full">
-                <div className={`w-12 h-12 ${item.bg} rounded-2xl flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform shrink-0`}>
-                  {item.icon}
-                </div>
-                <p className="text-xs font-extrabold text-gray-800 leading-tight truncate w-full mb-0.5">
-                  {item.name}
-                </p>
-                <p className="text-[9px] font-medium text-gray-400 truncate w-full">
-                  {item.desc}
-                </p>
+          {quickFeatures.map((item, idx) => (
+            <button 
+              key={idx} 
+              onClick={item.action} 
+              className="flex flex-col items-center p-3 rounded-2xl bg-white border border-gray-100 hover:border-sky-300 shadow-xs hover:shadow-md transition-all group cursor-pointer text-center h-full"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-sky-50/80 group-hover:bg-sky-100 border border-sky-100/60 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-all shrink-0">
+                {item.icon}
               </div>
-            );
-
-            if (item.href) {
-              return <Link key={idx} href={item.href} className="block">{content}</Link>;
-            }
-            return (
-              <button key={idx} onClick={item.action} className="text-left w-full">
-                {content}
-              </button>
-            );
-          })}
+              <p className="text-xs font-extrabold text-gray-800 leading-tight truncate w-full mb-0.5 group-hover:text-[var(--color-primary)] transition-colors">
+                {item.name}
+              </p>
+              <p className="text-[9px] font-medium text-gray-400 truncate w-full">
+                {item.desc}
+              </p>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* PILIHAN HARI INI: Promo Spesial Horizontal Carousel (Sewa Jetski Style) */}
+      {/* PILIHAN HARI INI: Promo Spesial */}
       <div>
         <div className="flex justify-between items-end mb-3.5 px-1">
           <div>
             <p className="text-[var(--color-primary)] font-black text-[10px] tracking-widest uppercase mb-0.5">PILIHAN HARI INI</p>
             <h2 className="font-display font-black text-lg text-gray-900">Promo & Voucher Eksklusif</h2>
           </div>
-          <button onClick={() => setActiveTab('points')} className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1">
+          <button onClick={() => setActiveTab('points')} className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1 cursor-pointer">
             Lihat Reward <ChevronRight size={13} />
           </button>
         </div>
@@ -408,37 +386,44 @@ function DashboardOverview({ t, locale, setActiveTab }) {
                 <p className="text-white/90 text-[10px] font-medium max-w-[170px] leading-tight">
                   {promo.desc}
                 </p>
-                <Link
-                  href="/booking"
-                  className="px-3 py-1.5 rounded-xl bg-white text-stone-900 text-[10px] font-black hover:bg-gray-100 transition-colors shadow-sm shrink-0"
+                <button
+                  onClick={() => {
+                    const targetBike = bikes.find(b => b.id === promo.bikeId) || bikes[0];
+                    onStartBooking(targetBike);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white text-stone-900 text-[10px] font-black hover:bg-gray-100 transition-colors shadow-sm shrink-0 cursor-pointer"
                 >
                   Klaim
-                </Link>
+                </button>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ARMADA SEPEDA SIAP GOWES: Horizontal Carousel (Sewa Jetski Style) */}
+      {/* Gambar 4 & 5: ARMADA SEPEDA SIAP GOWES — KLIK LANGSUNG KE DURASI SEWA (TETAP DI PWA MEMBER) */}
       <div>
         <div className="flex justify-between items-end mb-3.5 px-1">
           <div>
             <p className="text-[var(--color-primary)] font-black text-[10px] tracking-widest uppercase mb-0.5">ARMADA SEPEDA</p>
             <h2 className="font-display font-black text-lg text-gray-900">Pilih Unit Favorit Anda</h2>
           </div>
-          <Link href="/unit-sepeda" className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1">
+          <button 
+            onClick={onOpenBikeCatalog}
+            className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1 cursor-pointer"
+          >
             Lihat Semua <ChevronRight size={13} />
-          </Link>
+          </button>
         </div>
 
         <div className="flex overflow-x-auto gap-3.5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
-          {bikes.slice(0, 5).map((bike) => {
+          {bikes.slice(0, 6).map((bike) => {
             const minPrice = getLowestPrice(bike);
             return (
               <div
                 key={bike.id}
-                className="flex-shrink-0 w-[260px] sm:w-[270px] bg-white rounded-[24px] p-3.5 shadow-sm border border-gray-100 hover:shadow-md transition-all group snap-center flex flex-col justify-between"
+                onClick={() => onStartBooking(bike)}
+                className="flex-shrink-0 w-[260px] sm:w-[270px] bg-white rounded-[24px] p-3.5 shadow-sm border border-gray-100 hover:border-sky-300 hover:shadow-md transition-all group snap-center flex flex-col justify-between cursor-pointer"
               >
                 <div>
                   <div className="relative h-32 w-full rounded-2xl overflow-hidden bg-gray-50 mb-3 flex items-center justify-center p-2">
@@ -454,7 +439,7 @@ function DashboardOverview({ t, locale, setActiveTab }) {
                     </span>
                   </div>
 
-                  <h3 className="font-display font-bold text-sm text-gray-900 leading-tight truncate">
+                  <h3 className="font-display font-bold text-sm text-gray-900 leading-tight truncate group-hover:text-[var(--color-primary)] transition-colors">
                     {bike.name}
                   </h3>
                   <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1">
@@ -469,12 +454,15 @@ function DashboardOverview({ t, locale, setActiveTab }) {
                       {formatCurrency(minPrice)}
                     </span>
                   </div>
-                  <Link
-                    href={`/booking?bike=${bike.id}`}
-                    className="btn btn-primary px-3.5 py-1.5 text-xs font-bold shadow-xs"
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStartBooking(bike);
+                    }}
+                    className="btn btn-primary px-3.5 py-1.5 text-xs font-bold shadow-xs cursor-pointer"
                   >
                     Sewa
-                  </Link>
+                  </button>
                 </div>
               </div>
             );
@@ -497,10 +485,13 @@ function DashboardOverview({ t, locale, setActiveTab }) {
 
           <div className="flex overflow-x-auto gap-3.5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
             {tours.map((tour) => (
-              <Link
+              <div
                 key={tour.id}
-                href={`/trip-tour/${tour.slug}`}
-                className="flex-shrink-0 w-[260px] bg-white rounded-[24px] overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all group snap-center"
+                onClick={() => {
+                  const matchedBike = bikes[0];
+                  onStartBooking(matchedBike);
+                }}
+                className="flex-shrink-0 w-[260px] bg-white rounded-[24px] overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all group snap-center cursor-pointer"
               >
                 <div className="relative h-28 w-full">
                   <Image
@@ -526,7 +517,7 @@ function DashboardOverview({ t, locale, setActiveTab }) {
                     {formatCurrency(tour.price)}
                   </p>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>
@@ -595,7 +586,7 @@ function DashboardOverview({ t, locale, setActiveTab }) {
 
             <button
               onClick={() => setShowQRModal(false)}
-              className="btn btn-primary w-full py-2.5 text-xs font-bold"
+              className="btn btn-primary w-full py-2.5 text-xs font-bold cursor-pointer"
             >
               Tutup QR Code
             </button>
@@ -763,7 +754,7 @@ function RideTrackerTab({ t, locale }) {
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1 flex items-center justify-center gap-1">
                 <MapPin size={11} /> Kecepatan
               </p>
-              <p className="font-display font-black text-xl text-sky-600 tabular-nums">
+              <p className="font-display font-black text-xl text-[var(--color-primary)] tabular-nums">
                 {isTracking ? speed || avgSpeed : '0.0'} <span className="text-xs text-gray-400">km/h</span>
               </p>
             </div>
@@ -781,17 +772,17 @@ function RideTrackerTab({ t, locale }) {
           <div className="flex gap-3">
             <button
               onClick={handleToggleTrack}
-              className={`btn flex-1 py-3.5 font-display font-black text-base tracking-wider shadow-md transition-all ${
+              className={`btn flex-1 py-3.5 font-display font-black text-base tracking-wider shadow-md transition-all cursor-pointer ${
                 isTracking 
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-200' 
-                  : 'bg-[var(--color-primary)] hover:bg-sky-500 text-white shadow-sky-200'
+                  : 'btn-primary shadow-sky-200'
               }`}
             >
               {isTracking ? '■ Hentikan Gowes' : '▶ Mulai Gowes Sekarang'}
             </button>
             <button
               onClick={() => setShowShareModal(!showShareModal)}
-              className="btn bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-3.5 flex items-center gap-2 font-bold text-xs"
+              className="btn bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-3.5 flex items-center gap-2 font-bold text-xs cursor-pointer"
               title="Bagikan Sesi Gowes"
             >
               <Share2 size={16} />
@@ -810,7 +801,7 @@ function RideTrackerTab({ t, locale }) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   onClick={() => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`, '_blank')}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
                 >
                   WhatsApp
                 </button>
@@ -819,13 +810,13 @@ function RideTrackerTab({ t, locale }) {
                     navigator.clipboard?.writeText(shareText + '\n' + shareUrl);
                     alert('Teks riwayat gowes berhasil disalin!');
                   }}
-                  className="bg-pink-600 hover:bg-pink-700 text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold"
+                  className="bg-pink-600 hover:bg-pink-700 text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
                 >
                   Instagram
                 </button>
                 <button
                   onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank')}
-                  className="bg-stone-900 hover:bg-black text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold"
+                  className="bg-stone-900 hover:bg-black text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
                 >
                   X (Twitter)
                 </button>
@@ -834,7 +825,7 @@ function RideTrackerTab({ t, locale }) {
                     navigator.clipboard?.writeText(shareText + '\n' + shareUrl);
                     alert('Tautan disalin ke clipboard!');
                   }}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
                 >
                   Salin Teks
                 </button>
@@ -1115,7 +1106,7 @@ function SpinWheelAndPointsTab({ t, locale }) {
           <button
             onClick={handleSpin}
             disabled={isSpinning || userPoints < SPIN_COST}
-            className={`btn w-full py-3.5 font-display font-black text-sm tracking-wider flex items-center justify-center gap-2 ${
+            className={`btn w-full py-3.5 font-display font-black text-sm tracking-wider flex items-center justify-center gap-2 cursor-pointer ${
               isSpinning 
                 ? 'bg-gray-300 text-gray-500 cursor-wait' 
                 : userPoints < SPIN_COST 
@@ -1155,7 +1146,7 @@ function SpinWheelAndPointsTab({ t, locale }) {
                   </div>
                   <button
                     disabled={userPoints < reward.cost}
-                    className={`btn px-3 py-1.5 text-[10px] font-bold ${
+                    className={`btn px-3 py-1.5 text-[10px] font-bold cursor-pointer ${
                       userPoints >= reward.cost ? 'btn-primary' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                   >
@@ -1187,15 +1178,15 @@ function ReferralTab({ t, locale }) {
   return (
     <div className="space-y-6">
       {/* Referral Banner */}
-      <div className="rounded-[28px] p-6 bg-gradient-to-br from-emerald-600 via-teal-700 to-sky-700 text-white shadow-lg">
-        <p className="text-xs text-white/80 font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+      <div className="rounded-[28px] p-6 bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 text-white shadow-lg border border-sky-500/20">
+        <p className="text-xs text-sky-200 font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
           <LinkIcon size={14} /> Link Referral Pribadi Anda
         </p>
         <div className="flex gap-2 mb-3">
           <div className="clean-input !bg-white/10 !text-white !border-white/20 flex-1 truncate text-xs flex items-center">
             {d.referralLink}
           </div>
-          <button onClick={copyLink} className="btn bg-white text-emerald-800 px-5 py-2 text-xs font-bold whitespace-nowrap hover:bg-gray-100">
+          <button onClick={copyLink} className="btn bg-white text-gray-900 px-5 py-2 text-xs font-bold whitespace-nowrap hover:bg-gray-100 cursor-pointer">
             {copied ? '✓ Tersalin!' : 'Salin Link'}
           </button>
         </div>
@@ -1207,17 +1198,17 @@ function ReferralTab({ t, locale }) {
       {/* Stats */}
       <div className="grid gap-3 grid-cols-3">
         <div className="bg-white rounded-2xl p-4 text-center border border-gray-100 shadow-sm">
-          <MousePointerClick className="mx-auto text-gray-400 mb-1" size={20} />
+          <MousePointerClick className="mx-auto text-[var(--color-primary)] mb-1" size={20} />
           <p className="font-display font-black text-xl text-gray-900">{d.referralStats.clicks}</p>
           <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Total Klik</p>
         </div>
         <div className="bg-white rounded-2xl p-4 text-center border border-gray-100 shadow-sm">
-          <Users className="mx-auto text-gray-400 mb-1" size={20} />
+          <Users className="mx-auto text-[var(--color-primary)] mb-1" size={20} />
           <p className="font-display font-black text-xl text-gray-900">{d.referralStats.signups}</p>
           <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Pendaftar</p>
         </div>
         <div className="bg-white rounded-2xl p-4 text-center border border-gray-100 shadow-sm">
-          <DollarSign className="mx-auto text-emerald-500 mb-1" size={20} />
+          <DollarSign className="mx-auto text-[var(--color-primary)] mb-1" size={20} />
           <p className="font-display font-black text-lg text-gray-900 truncate">{formatCurrency(d.referralStats.earnings)}</p>
           <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Total Komisi</p>
         </div>
@@ -1229,7 +1220,7 @@ function ReferralTab({ t, locale }) {
         <p className="text-xs text-gray-500 mb-4 max-w-sm mx-auto">
           Komisi dapat dicairkan langsung ke rekening BCA/Mandiri atau e-wallet (GoPay, OVO, ShopeePay) dengan minimal Rp 50.000.
         </p>
-        <button className="btn btn-primary px-8 py-3 text-xs font-bold flex items-center justify-center gap-2 mx-auto shadow-md">
+        <button className="btn btn-primary px-8 py-3 text-xs font-bold flex items-center justify-center gap-2 mx-auto shadow-md cursor-pointer">
           <CreditCard size={15} /> Ajukan Penarikan Komisi
         </button>
       </div>
@@ -1244,6 +1235,11 @@ export default function MemberPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  
+  // In-App Booking State (Gambar 4 & 5)
+  const [selectedBookingBike, setSelectedBookingBike] = useState(null);
+  const [showBikeCatalogModal, setShowBikeCatalogModal] = useState(false);
+  const [history, setHistory] = useState(memberData.bookingHistory);
 
   useEffect(() => {
     // Check member authentication
@@ -1254,11 +1250,28 @@ export default function MemberPage() {
       setIsAuthenticated(true);
     }
     setIsChecking(false);
+
+    // Load saved bookings
+    const saved = localStorage.getItem('memberBookings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setTimeout(() => {
+            setHistory([...parsed, ...memberData.bookingHistory]);
+          }, 0);
+        }
+      } catch (e) { /* ignore */ }
+    }
   }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem('isMember');
     router.push('/login');
+  };
+
+  const handleBookingSuccess = (newBooking) => {
+    setHistory(prev => [newBooking, ...prev]);
   };
 
   if (isChecking) {
@@ -1280,7 +1293,7 @@ export default function MemberPage() {
       {/* PWA Install Banner & Offline Alert */}
       <PWAInstallBanner />
 
-      {/* Hero Header (Sewa Jetski Banyuwangi Style) */}
+      {/* Hero Header (Gambar 2: Warna senada & harmonis dengan UI) */}
       <div className="relative h-[280px] sm:h-[300px] w-full bg-slate-900 rounded-b-[36px] overflow-hidden shadow-lg">
         <Image
           src="/images/hero-banner.png"
@@ -1302,11 +1315,14 @@ export default function MemberPage() {
               <ArrowLeft size={13} />
               <span>Ke Web</span>
             </Link>
-            <span className="px-2.5 py-1 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-sm text-white text-[10px] font-black tracking-wider uppercase">
+            
+            {/* Gambar 2: Badge MEMBER PWA senada tema */}
+            <span className="px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-200 border border-sky-400/30 backdrop-blur-sm text-[10px] font-black tracking-wider uppercase">
               MEMBER PWA
             </span>
           </div>
 
+          {/* Gambar 2: Tombol Download & Logout Senada (bukan merah kontras menyala) */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
@@ -1314,14 +1330,14 @@ export default function MemberPage() {
                   window.dispatchEvent(new CustomEvent('open-pwa-install'));
                 }
               }}
-              className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md text-white flex items-center justify-center border border-white/20 transition-colors"
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-sky-200 hover:text-white flex items-center justify-center border border-white/15 transition-colors cursor-pointer"
               title="Pasang Aplikasi PWA"
             >
               <Download size={15} />
             </button>
             <button
               onClick={handleLogout}
-              className="w-9 h-9 rounded-full bg-red-500/80 hover:bg-red-600 backdrop-blur-md text-white flex items-center justify-center border border-white/20 transition-colors"
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-red-500/20 backdrop-blur-md text-white/80 hover:text-red-300 border border-white/15 hover:border-red-400/30 flex items-center justify-center transition-colors cursor-pointer"
               title="Logout"
             >
               <LogOut size={15} />
@@ -1340,7 +1356,8 @@ export default function MemberPage() {
             <h1 className="text-white font-extrabold text-2xl drop-shadow-md">
               {memberData.name}
             </h1>
-            <span className="px-2 py-0.5 rounded-full bg-amber-400 text-stone-900 text-[10px] font-black uppercase">
+            {/* Gambar 2: Badge GOLD senada & elegan */}
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase backdrop-blur-sm">
               {memberData.level}
             </span>
           </div>
@@ -1356,7 +1373,7 @@ export default function MemberPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`btn px-4 py-2 text-xs font-bold whitespace-nowrap flex items-center gap-2 transition-all ${
+              className={`btn px-4 py-2 text-xs font-bold whitespace-nowrap flex items-center gap-2 transition-all cursor-pointer ${
                 activeTab === tab.id
                   ? 'btn-primary shadow-sm'
                   : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'
@@ -1370,7 +1387,14 @@ export default function MemberPage() {
         {/* Tab Content Display */}
         <div className="animate-fade-in" key={activeTab}>
           {activeTab === 'dashboard' && (
-            <DashboardOverview t={t} locale={locale} setActiveTab={setActiveTab} />
+            <DashboardOverview 
+              t={t} 
+              locale={locale} 
+              setActiveTab={setActiveTab}
+              onStartBooking={(bike) => setSelectedBookingBike(bike)}
+              onOpenBikeCatalog={() => setShowBikeCatalogModal(true)}
+              history={history}
+            />
           )}
           {activeTab === 'tracker' && (
             <RideTrackerTab t={t} locale={locale} />
@@ -1387,6 +1411,22 @@ export default function MemberPage() {
         </div>
       </div>
 
+      {/* Gambar 4 & 5: IN-APP BOOKING MODAL (Langsung Pilih Durasi Sewa, Tetap di Dashboard Member PWA) */}
+      {selectedBookingBike && (
+        <InAppBookingModal
+          bike={selectedBookingBike}
+          onClose={() => setSelectedBookingBike(null)}
+          onSuccess={handleBookingSuccess}
+        />
+      )}
+
+      {/* In-App Bike Catalog Modal (Jika klik "Sewa Sepeda" di 8 Menu Cepat) */}
+      <InAppBikeCatalogModal
+        isOpen={showBikeCatalogModal}
+        onClose={() => setShowBikeCatalogModal(false)}
+        onSelectBike={(bike) => setSelectedBookingBike(bike)}
+      />
+
       {/* Floating Bottom App Navigation (Sewa Jetski Banyuwangi PWA Style) */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
         <div className="bg-white/95 backdrop-blur-md rounded-full shadow-[0_10px_35px_rgba(0,0,0,0.12)] border border-gray-100/80 px-4 py-2.5 flex items-center justify-around">
@@ -1396,7 +1436,7 @@ export default function MemberPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center justify-center p-2 rounded-full transition-all duration-300 relative ${
+                className={`flex flex-col items-center justify-center p-2 rounded-full transition-all duration-300 relative cursor-pointer ${
                   isActive
                     ? 'text-[var(--color-primary)] font-bold scale-105'
                     : 'text-gray-400 hover:text-gray-600'
