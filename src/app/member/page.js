@@ -622,6 +622,10 @@ function RideTrackerTab({ t, locale }) {
   const watchIdRef = useRef(null);
   const timerRef = useRef(null);
   const lastCoordsRef = useRef(null);
+  const simulationRef = useRef(null);
+  const simAngleRef = useRef(0);
+  const simRadiusRef = useRef(0);
+  const simCenterRef = useRef({ lat: -8.2192, lng: 114.3692 });
 
   const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
@@ -647,6 +651,40 @@ function RideTrackerTab({ t, locale }) {
   
   const caloriesBurned = calculateCalories();
 
+  const startSimulation = (centerLat, centerLng) => {
+    simCenterRef.current = { lat: centerLat, lng: centerLng };
+    simAngleRef.current = Math.random() * 360;
+    simRadiusRef.current = 0;
+    setGpsStatus('GPS SIMULASI (AKTIF)');
+
+    simulationRef.current = setInterval(() => {
+      // Simulate cycling movement around center point
+      simAngleRef.current += 0.8; // degrees per tick
+      simRadiusRef.current = Math.min(simRadiusRef.current + 0.00003, 0.008);
+      const rad = simAngleRef.current * (Math.PI / 180);
+      const newLat = simCenterRef.current.lat + simRadiusRef.current * Math.sin(rad);
+      const newLng = simCenterRef.current.lng + simRadiusRef.current * Math.cos(rad);
+
+      const newPos = { lat: newLat, lng: newLng };
+
+      if (lastCoordsRef.current) {
+        const dist = getDistanceFromLatLonInKm(
+          lastCoordsRef.current.lat,
+          lastCoordsRef.current.lng,
+          newLat,
+          newLng
+        );
+        setDistance(prev => prev + dist);
+      }
+
+      // Simulated speed: 12-22 km/h with slight variation
+      const simSpeed = (15 + Math.sin(simAngleRef.current * 0.05) * 5).toFixed(1);
+      setSpeed(simSpeed);
+      lastCoordsRef.current = { lat: newLat, lng: newLng };
+      setLocation(newPos);
+    }, 1500); // update every 1.5 seconds
+  };
+
   const handleToggleTrack = () => {
     if (isTracking) {
       setIsTracking(false);
@@ -655,8 +693,10 @@ function RideTrackerTab({ t, locale }) {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
       if (timerRef.current) clearInterval(timerRef.current);
+      if (simulationRef.current) clearInterval(simulationRef.current);
     } else {
       setIsTracking(true);
+      setSpeed(0);
       setGpsStatus('MENCARI POSISI GPS...');
       
       timerRef.current = setInterval(() => {
@@ -688,13 +728,18 @@ function RideTrackerTab({ t, locale }) {
             setLocation({ lat: latitude, lng: longitude });
           },
           (error) => {
-            console.warn(error);
-            setGpsStatus('GPS SIMULASI (AKTIF)');
+            console.warn('GPS error, switching to simulation:', error);
+            // Start simulation from last known position or Banyuwangi center
+            const center = lastCoordsRef.current 
+              ? { lat: lastCoordsRef.current.lat || lastCoordsRef.current.latitude, lng: lastCoordsRef.current.lng || lastCoordsRef.current.longitude }
+              : { lat: -8.2192, lng: 114.3692 };
+            startSimulation(center.lat, center.lng);
           },
           { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
         );
       } else {
-        setGpsStatus('GPS TIDAK DIDUKUNG');
+        // No geolocation support — start simulation immediately
+        startSimulation(-8.2192, 114.3692);
       }
     }
   };
@@ -705,6 +750,7 @@ function RideTrackerTab({ t, locale }) {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
       if (timerRef.current) clearInterval(timerRef.current);
+      if (simulationRef.current) clearInterval(simulationRef.current);
     };
   }, []);
 
@@ -935,6 +981,9 @@ function RuteGowesTab({ t, locale }) {
   const [reachedCheckpoints, setReachedCheckpoints] = useState(new Set());
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef(null);
+  const simIntervalRef = useRef(null);
+  const simCheckpointIdxRef = useRef(0);
+  const simProgressRef = useRef(0);
 
   // Default cycling routes (admin can manage these via /admin/routes)
   const [cyclingRoutes, setCyclingRoutes] = useState([]);
@@ -955,68 +1004,156 @@ function RuteGowesTab({ t, locale }) {
     setCyclingRoutes(DEFAULT_CYCLING_ROUTES);
   }, []);
 
+  const startRouteSimulation = (route) => {
+    const cps = route?.checkpoints;
+    if (!cps || cps.length < 2) {
+      // Free-ride simulation from Banyuwangi center
+      const center = { lat: -8.2192, lng: 114.3692 };
+      let angle = 0;
+      let radius = 0;
+      let prevPos = null;
+      simIntervalRef.current = setInterval(() => {
+        angle += 1;
+        radius = Math.min(radius + 0.00004, 0.01);
+        const rad = angle * (Math.PI / 180);
+        const newLat = center.lat + radius * Math.sin(rad);
+        const newLng = center.lng + radius * Math.cos(rad);
+        const newPos = { lat: newLat, lng: newLng };
+        if (prevPos) {
+          const R = 6371;
+          const dLat = (newLat - prevPos.lat) * Math.PI / 180;
+          const dLon = (newLng - prevPos.lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2)**2 + Math.cos(prevPos.lat*Math.PI/180)*Math.cos(newLat*Math.PI/180)*Math.sin(dLon/2)**2;
+          const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          setDistanceTraveled(prev => prev + distKm);
+        }
+        const simSpeed = Math.round(14 + Math.sin(angle * 0.04) * 5);
+        setCurrentSpeed(simSpeed);
+        setUserPosition(newPos);
+        prevPos = newPos;
+      }, 2000);
+      return;
+    }
+
+    simCheckpointIdxRef.current = 0;
+    simProgressRef.current = 0;
+
+    simIntervalRef.current = setInterval(() => {
+      const idx = simCheckpointIdxRef.current;
+      const nextIdx = (idx + 1) % cps.length;
+      const from = cps[idx];
+      const to = cps[nextIdx];
+
+      simProgressRef.current += 0.05;
+      if (simProgressRef.current >= 1) {
+        simProgressRef.current = 0;
+        simCheckpointIdxRef.current = nextIdx;
+      }
+
+      const t = simProgressRef.current;
+      const newLat = from.lat + (to.lat - from.lat) * t;
+      const newLng = from.lng + (to.lng - from.lng) * t;
+      const newPos = { lat: newLat, lng: newLng };
+
+      const R = 6371;
+      const dLat = (to.lat - from.lat) * Math.PI / 180;
+      const dLon = (to.lng - from.lng) * Math.PI / 180;
+      const segDistKm = R * 2 * Math.atan2(
+        Math.sqrt(Math.sin(dLat/2)**2 + Math.cos(from.lat*Math.PI/180)*Math.cos(to.lat*Math.PI/180)*Math.sin(dLon/2)**2),
+        Math.sqrt(1 - (Math.sin(dLat/2)**2 + Math.cos(from.lat*Math.PI/180)*Math.cos(to.lat*Math.PI/180)*Math.sin(dLon/2)**2))
+      );
+      setDistanceTraveled(prev => prev + segDistKm * 0.05);
+
+      const simSpeed = Math.round(16 + Math.sin(Date.now() / 3000) * 6);
+      setCurrentSpeed(simSpeed);
+      setUserPosition(newPos);
+    }, 1500);
+  };
+
   // GPS Watcher
   useEffect(() => {
     if (!isNavigating || isPaused) return;
-    if (!('geolocation' in navigator)) return;
-
     let prevPos = null;
     let prevTime = Date.now();
+    let watchId = null;
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const newPos = { lat, lng };
-        setUserPosition(newPos);
+    const setupSimulation = () => {
+      if (!simIntervalRef.current) {
+        startRouteSimulation(selectedRoute);
+      }
+    };
 
-        let speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
-        if (!pos.coords.speed && prevPos) {
-          const timeDiff = (Date.now() - prevTime) / 1000;
-          if (timeDiff > 1) {
-            const R = 6371;
-            const dLat = (lat - prevPos.lat) * Math.PI / 180;
-            const dLon = (lng - prevPos.lng) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(prevPos.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLon/2)**2;
-            const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            speed = distKm / (timeDiff / 3600);
-            setDistanceTraveled(prev => prev + distKm);
+    if ('geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          // Stop any simulation if real GPS kicks in
+          if (simIntervalRef.current) {
+            clearInterval(simIntervalRef.current);
+            simIntervalRef.current = null;
           }
-        } else if (pos.coords.speed && prevPos) {
-          const timeDiff = (Date.now() - prevTime) / 1000;
-          setDistanceTraveled(prev => prev + (speed / 3600) * timeDiff);
-        }
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const newPos = { lat, lng };
+          setUserPosition(newPos);
 
-        prevPos = newPos;
-        prevTime = Date.now();
-        setCurrentSpeed(Math.min(60, Math.round(speed)));
-
-        // Checkpoint detection (within 80m)
-        if (selectedRoute?.checkpoints) {
-          selectedRoute.checkpoints.forEach((cp, idx) => {
-            const cpId = cp.id || `cp-${idx}`;
-            if (reachedCheckpoints.has(cpId)) return;
-            const R2 = 6371;
-            const dLat2 = (cp.lat - lat) * Math.PI / 180;
-            const dLon2 = (cp.lng - lng) * Math.PI / 180;
-            const a2 = Math.sin(dLat2/2)**2 + Math.cos(lat*Math.PI/180)*Math.cos(cp.lat*Math.PI/180)*Math.sin(dLon2/2)**2;
-            const distKm2 = R2 * 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1-a2));
-            if (distKm2 <= 0.08) {
-              setReachedCheckpoints(prev => new Set(prev).add(cpId));
-              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          let speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
+          if (!pos.coords.speed && prevPos) {
+            const timeDiff = (Date.now() - prevTime) / 1000;
+            if (timeDiff > 1) {
+              const R = 6371;
+              const dLat = (lat - prevPos.lat) * Math.PI / 180;
+              const dLon = (lng - prevPos.lng) * Math.PI / 180;
+              const a = Math.sin(dLat/2)**2 + Math.cos(prevPos.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLon/2)**2;
+              const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              speed = distKm / (timeDiff / 3600);
+              setDistanceTraveled(prev => prev + distKm);
             }
-          });
-        }
-      },
-      () => {
-        // Fallback for GPS error - set mock position near Banyuwangi
-        setUserPosition({ lat: -8.2192, lng: 114.3692 });
-      },
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 8000 }
-    );
+          } else if (pos.coords.speed && prevPos) {
+            const timeDiff = (Date.now() - prevTime) / 1000;
+            setDistanceTraveled(prev => prev + (speed / 3600) * timeDiff);
+          }
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [isNavigating, isPaused, selectedRoute, reachedCheckpoints]);
+          prevPos = newPos;
+          prevTime = Date.now();
+          setCurrentSpeed(Math.min(60, Math.round(speed)));
+
+          // Checkpoint detection (within 80m)
+          if (selectedRoute?.checkpoints) {
+            selectedRoute.checkpoints.forEach((cp, idx) => {
+              const cpId = cp.id || `cp-${idx}`;
+              if (reachedCheckpoints.has(cpId)) return;
+              const R2 = 6371;
+              const dLat2 = (cp.lat - lat) * Math.PI / 180;
+              const dLon2 = (cp.lng - lng) * Math.PI / 180;
+              const a2 = Math.sin(dLat2/2)**2 + Math.cos(lat*Math.PI/180)*Math.cos(cp.lat*Math.PI/180)*Math.sin(dLon2/2)**2;
+              const distKm2 = R2 * 2 * Math.atan2(Math.sqrt(a2), Math.sqrt(1-a2));
+              if (distKm2 <= 0.08) {
+                setReachedCheckpoints(prev => new Set(prev).add(cpId));
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+              }
+            });
+          }
+        },
+        () => {
+          // GPS failed — start simulation
+          setupSimulation();
+        },
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 6000 }
+      );
+    } else {
+      // No geolocation support
+      setupSimulation();
+    }
+
+    return () => {
+      if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (simIntervalRef.current) {
+        clearInterval(simIntervalRef.current);
+        simIntervalRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNavigating, isPaused, selectedRoute]);
 
   // Timer
   useEffect(() => {
@@ -1053,6 +1190,10 @@ function RuteGowesTab({ t, locale }) {
     setCurrentSpeed(0);
     setReachedCheckpoints(new Set());
     clearInterval(timerRef.current);
+    if (simIntervalRef.current) {
+      clearInterval(simIntervalRef.current);
+      simIntervalRef.current = null;
+    }
   };
 
   // NAVIGASI AKTIF VIEW
@@ -1738,6 +1879,7 @@ export default function MemberPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [memberProfile, setMemberProfile] = useState(null);
   
   // In-App Booking State (Gambar 4 & 5)
   const [selectedBookingBike, setSelectedBookingBike] = useState(null);
@@ -1751,6 +1893,13 @@ export default function MemberPage() {
       router.push('/login');
     } else {
       setIsAuthenticated(true);
+      // Load saved member profile (from registration/login)
+      const savedProfile = localStorage.getItem('memberProfile');
+      if (savedProfile) {
+        try {
+          setMemberProfile(JSON.parse(savedProfile));
+        } catch (e) { /* use defaults */ }
+      }
     }
     setIsChecking(false);
 
@@ -1786,6 +1935,7 @@ export default function MemberPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('isMember');
+    localStorage.removeItem('memberProfile');
     router.push('/login');
   };
 
@@ -1874,7 +2024,7 @@ export default function MemberPage() {
           <p className="text-white/80 text-xs font-medium">Selamat datang kembali,</p>
           <div className="flex items-center gap-2.5 mt-0.5">
             <h1 className="text-white font-extrabold text-2xl drop-shadow-md">
-              {memberData.name}
+              {memberProfile?.name || memberData.name}
             </h1>
             {/* Gambar 2: Badge GOLD senada & elegan */}
             <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase backdrop-blur-sm">

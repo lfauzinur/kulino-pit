@@ -54,6 +54,18 @@ export default function UnifiedLogin() {
   const handleGoogleAuth = () => {
     setLoading(true);
     setTimeout(() => {
+      // Restore/use existing profile if registered before, or create new
+      const existingProfile = localStorage.getItem('memberProfile');
+      if (!existingProfile) {
+        const googleUser = {
+          name: 'Pengguna Google',
+          email: 'user@gmail.com',
+          photo: null,
+          provider: 'google',
+          loginAt: new Date().toISOString(),
+        };
+        localStorage.setItem('memberProfile', JSON.stringify(googleUser));
+      }
       localStorage.setItem('isMember', 'true');
       router.push(getRedirectUrl('default'));
     }, 1000);

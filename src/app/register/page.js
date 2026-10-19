@@ -30,7 +30,14 @@ export default function MemberRegister() {
     // Simulate API call
     setTimeout(() => {
       // Simulate successful registration and login
+      const memberProfile = {
+        name: name,
+        wa: wa,
+        provider: 'form',
+        registeredAt: new Date().toISOString(),
+      };
       localStorage.setItem('isMember', 'true');
+      localStorage.setItem('memberProfile', JSON.stringify(memberProfile));
       router.push(getMemberRedirect());
     }, 1000);
   };
@@ -38,7 +45,16 @@ export default function MemberRegister() {
   const handleGoogleAuth = () => {
     setLoading(true);
     setTimeout(() => {
+      // Simulate Google OAuth: store user profile from Google account
+      const googleUser = {
+        name: 'Pengguna Google',
+        email: 'user@gmail.com',
+        photo: null,
+        provider: 'google',
+        registeredAt: new Date().toISOString(),
+      };
       localStorage.setItem('isMember', 'true');
+      localStorage.setItem('memberProfile', JSON.stringify(googleUser));
       router.push(getMemberRedirect());
     }, 1000);
   };
