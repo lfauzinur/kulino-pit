@@ -36,8 +36,11 @@ function HeroSection({ t, locale }) {
             </div>
           </div>
 
-          {/* Right Image */}
-          <div className="relative h-[300px] sm:h-[400px] lg:h-[500px] w-full animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          {/* Right: Bike + Mascot */}
+          <div className="relative h-[320px] sm:h-[420px] lg:h-[520px] w-full animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            {/* Circle Accent Behind */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[75%] h-[75%] bg-white rounded-full shadow-[var(--shadow-soft)] -z-0" />
+
             {/* The main featured bike */}
             <Image 
               src={bikes[0].image} 
@@ -47,8 +50,28 @@ function HeroSection({ t, locale }) {
               sizes="(max-width: 768px) 100vw, 50vw"
               priority
             />
-            {/* Circle Accent Behind Bike */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-white rounded-full shadow-[var(--shadow-soft)] -z-0"></div>
+
+            {/* Mascot floating over the bike */}
+            <div
+              className="absolute bottom-2 right-0 z-20 w-[140px] h-[140px] sm:w-[180px] sm:h-[180px] lg:w-[200px] lg:h-[200px]"
+              style={{ animation: 'float 3.5s ease-in-out infinite' }}
+            >
+              <Image
+                src="/images/mascot-wave.png"
+                alt="Maskot Kulino Pit"
+                fill
+                className="object-contain drop-shadow-2xl"
+                sizes="200px"
+                priority
+              />
+            </div>
+
+            {/* Badge floating */}
+            <div className="absolute top-6 right-6 z-20 bg-white rounded-2xl shadow-lg px-4 py-3 border border-gray-100 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">🏆 Terpercaya</p>
+              <p className="font-display font-black text-sm text-gray-900">500+ Goweser</p>
+              <p className="text-[10px] text-[var(--color-primary)] font-semibold">Banyuwangi 🌴</p>
+            </div>
           </div>
         </div>
 
@@ -96,6 +119,7 @@ function HeroSection({ t, locale }) {
     </section>
   );
 }
+
 
 /* ─── About Section ─── */
 function AboutSection({ t }) {

@@ -615,7 +615,9 @@ function RideTrackerTab({ t, locale }) {
   const [time, setTime] = useState(0);
   const [distance, setDistance] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   
+  // Default ke Banyuwangi, akan diupdate ke lokasi real saat halaman dimuat
   const [location, setLocation] = useState({ lat: -8.2192, lng: 114.3692 });
   const [speed, setSpeed] = useState(0);
   const [gpsStatus, setGpsStatus] = useState('MENUNGGU SINYAL GPS');
@@ -626,6 +628,28 @@ function RideTrackerTab({ t, locale }) {
   const simAngleRef = useRef(0);
   const simRadiusRef = useRef(0);
   const simCenterRef = useRef({ lat: -8.2192, lng: 114.3692 });
+  const realUserLocationRef = useRef(null); // Simpan lokasi real user
+
+  // ── Ambil lokasi real user saat komponen mount ──
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      setGpsStatus('MENDETEKSI LOKASI ANDA...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          realUserLocationRef.current = { lat: latitude, lng: longitude };
+          setLocation({ lat: latitude, lng: longitude });
+          simCenterRef.current = { lat: latitude, lng: longitude };
+          setGpsStatus('LOKASI DITEMUKAN');
+        },
+        (err) => {
+          console.warn('Gagal mendapatkan lokasi awal:', err);
+          setGpsStatus('GPS TIDAK TERSEDIA');
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    }
+  }, []);
 
   const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
     const R = 6371;
@@ -655,17 +679,16 @@ function RideTrackerTab({ t, locale }) {
     simCenterRef.current = { lat: centerLat, lng: centerLng };
     simAngleRef.current = Math.random() * 360;
     simRadiusRef.current = 0;
+    lastCoordsRef.current = { lat: centerLat, lng: centerLng };
     setGpsStatus('GPS SIMULASI (AKTIF)');
 
     simulationRef.current = setInterval(() => {
-      // Simulate cycling movement around center point
-      simAngleRef.current += 0.8; // degrees per tick
+      // Simulasi pergerakan bersepeda
+      simAngleRef.current += 0.8;
       simRadiusRef.current = Math.min(simRadiusRef.current + 0.00003, 0.008);
       const rad = simAngleRef.current * (Math.PI / 180);
       const newLat = simCenterRef.current.lat + simRadiusRef.current * Math.sin(rad);
       const newLng = simCenterRef.current.lng + simRadiusRef.current * Math.cos(rad);
-
-      const newPos = { lat: newLat, lng: newLng };
 
       if (lastCoordsRef.current) {
         const dist = getDistanceFromLatLonInKm(
@@ -677,69 +700,98 @@ function RideTrackerTab({ t, locale }) {
         setDistance(prev => prev + dist);
       }
 
-      // Simulated speed: 12-22 km/h with slight variation
       const simSpeed = (15 + Math.sin(simAngleRef.current * 0.05) * 5).toFixed(1);
       setSpeed(simSpeed);
       lastCoordsRef.current = { lat: newLat, lng: newLng };
-      setLocation(newPos);
-    }, 1500); // update every 1.5 seconds
+      setLocation({ lat: newLat, lng: newLng });
+    }, 1500);
   };
 
   const handleToggleTrack = () => {
     if (isTracking) {
+      // ── STOP TRACKING ──
       setIsTracking(false);
       setGpsStatus('TRACKING DIHENTIKAN');
       if (watchIdRef.current && typeof navigator !== 'undefined') {
         navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (simulationRef.current) clearInterval(simulationRef.current);
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (simulationRef.current) { clearInterval(simulationRef.current); simulationRef.current = null; }
     } else {
-      setIsTracking(true);
+      // ── START TRACKING — reset semua data dulu ──
+      setTime(0);
+      setDistance(0);
       setSpeed(0);
+      lastCoordsRef.current = null;
+      setIsTracking(true);
+      setIsLocating(true);
       setGpsStatus('MENCARI POSISI GPS...');
-      
+
       timerRef.current = setInterval(() => {
         setTime(prev => prev + 1);
       }, 1000);
 
       if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (position) => {
-            setGpsStatus('SINYAL GPS TERKUNCI');
-            const { latitude, longitude, speed: gpsSpd } = position.coords;
-            if (gpsSpd !== null && gpsSpd !== undefined && gpsSpd >= 0) {
-              setSpeed((gpsSpd * 3.6).toFixed(1));
-            }
-            
-            if (lastCoordsRef.current) {
-              const dist = getDistanceFromLatLonInKm(
-                lastCoordsRef.current.latitude,
-                lastCoordsRef.current.longitude,
-                latitude,
-                longitude
-              );
-              if (dist > 0.002) {
-                setDistance(prev => prev + dist);
-              }
-            }
-            
-            lastCoordsRef.current = { latitude, longitude };
+        // Ambil posisi awal yang presisi sebelum mulai watch
+        navigator.geolocation.getCurrentPosition(
+          (initPos) => {
+            const { latitude, longitude } = initPos.coords;
+            realUserLocationRef.current = { lat: latitude, lng: longitude };
+            lastCoordsRef.current = { lat: latitude, lng: longitude };
             setLocation({ lat: latitude, lng: longitude });
+            setIsLocating(false);
+            setGpsStatus('SINYAL GPS TERKUNCI');
+
+            // Mulai watch setelah dapat posisi awal
+            watchIdRef.current = navigator.geolocation.watchPosition(
+              (position) => {
+                setGpsStatus('SINYAL GPS TERKUNCI');
+                const { latitude: lat, longitude: lng, speed: gpsSpd } = position.coords;
+                
+                if (gpsSpd !== null && gpsSpd !== undefined && gpsSpd >= 0) {
+                  setSpeed((gpsSpd * 3.6).toFixed(1));
+                }
+
+                if (lastCoordsRef.current) {
+                  const dist = getDistanceFromLatLonInKm(
+                    lastCoordsRef.current.lat,
+                    lastCoordsRef.current.lng,
+                    lat,
+                    lng
+                  );
+                  // Filter noise GPS (minimal 5 meter pergerakan)
+                  if (dist > 0.005) {
+                    setDistance(prev => prev + dist);
+                    lastCoordsRef.current = { lat, lng };
+                  }
+                } else {
+                  lastCoordsRef.current = { lat, lng };
+                }
+
+                setLocation({ lat, lng });
+              },
+              (error) => {
+                console.warn('GPS watch error, beralih ke simulasi:', error);
+                setIsLocating(false);
+                const center = realUserLocationRef.current || { lat: -8.2192, lng: 114.3692 };
+                startSimulation(center.lat, center.lng);
+              },
+              { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+            );
           },
-          (error) => {
-            console.warn('GPS error, switching to simulation:', error);
-            // Start simulation from last known position or Banyuwangi center
-            const center = lastCoordsRef.current 
-              ? { lat: lastCoordsRef.current.lat || lastCoordsRef.current.latitude, lng: lastCoordsRef.current.lng || lastCoordsRef.current.longitude }
-              : { lat: -8.2192, lng: 114.3692 };
+          (initError) => {
+            console.warn('Tidak bisa ambil posisi awal, beralih ke simulasi:', initError);
+            setIsLocating(false);
+            const center = realUserLocationRef.current || { lat: -8.2192, lng: 114.3692 };
             startSimulation(center.lat, center.lng);
           },
-          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
         );
       } else {
-        // No geolocation support — start simulation immediately
-        startSimulation(-8.2192, 114.3692);
+        setIsLocating(false);
+        const center = realUserLocationRef.current || { lat: -8.2192, lng: 114.3692 };
+        startSimulation(center.lat, center.lng);
       }
     }
   };
@@ -829,13 +881,16 @@ function RideTrackerTab({ t, locale }) {
           <div className="flex gap-3">
             <button
               onClick={handleToggleTrack}
+              disabled={isLocating}
               className={`btn flex-1 py-3.5 font-display font-black text-base tracking-wider shadow-md transition-all cursor-pointer ${
-                isTracking 
+                isLocating
+                  ? 'bg-amber-400 text-white shadow-amber-200 animate-pulse cursor-not-allowed'
+                  : isTracking 
                   ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-200' 
                   : 'btn-primary shadow-sky-200'
               }`}
             >
-              {isTracking ? '■ Hentikan Gowes' : '▶ Mulai Gowes Sekarang'}
+              {isLocating ? '📍 Mendapatkan Lokasi...' : isTracking ? '■ Hentikan Gowes' : '▶ Mulai Gowes Sekarang'}
             </button>
             <button
               onClick={() => setShowShareModal(!showShareModal)}

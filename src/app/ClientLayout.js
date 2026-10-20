@@ -3,6 +3,7 @@ import { I18nProvider } from '@/lib/i18n';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import PageLoader from '@/components/PageLoader';
+import MascotWidget from '@/components/MascotWidget';
 import { usePathname } from 'next/navigation';
 
 export default function ClientLayout({ children }) {
@@ -18,7 +19,7 @@ export default function ClientLayout({ children }) {
         {children}
       </main>
       {!isAdmin && !isMember && <Footer />}
+      <MascotWidget />
     </I18nProvider>
   );
 }
-
