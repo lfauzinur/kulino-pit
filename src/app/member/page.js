@@ -892,7 +892,139 @@ function RideTrackerTab({ t, locale }) {
   };
 
   const shareText = `🚴 Sesi Gowes Bersama Kulino Pit Banyuwangi!\n⏱ Waktu: ${formatTime(time)}\n📏 Jarak: ${distance.toFixed(2)} km\n⚡ Kec. Rata: ${avgSpeed} km/h\n🔥 Kalori: ${caloriesBurned} kcal\n\n#KulinoPit #GowesBanyuwangi #ExploreBanyuwangi`;
-  const shareUrl = 'https://kulinopit.id';
+  const shareUrl = 'https://kulino-pit.vercel.app';
+  const [shareCardBg, setShareCardBg] = useState(null); // custom background image
+  const shareCanvasRef = useRef(null);
+  const bgInputRef = useRef(null);
+
+  const generateShareImage = () => {
+    const canvas = shareCanvasRef.current;
+    if (!canvas) return null;
+    const W = 540, H = 960;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    if (shareCardBg) {
+      ctx.drawImage(shareCardBg, 0, 0, W, H);
+      // Dark overlay
+      ctx.fillStyle = 'rgba(0,0,0,0.62)';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      // Gradient dark background
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0a0a0a');
+      grad.addColorStop(0.5, '#111827');
+      grad.addColorStop(1, '#0a0a0a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Accent line top
+    ctx.fillStyle = '#E05A2B';
+    ctx.fillRect(0, 0, W, 5);
+
+    // Brand tag top
+    ctx.font = 'bold 22px Inter, Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.textAlign = 'center';
+    ctx.fillText('KULINO PIT', W/2, 60);
+    ctx.font = '14px Inter, Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText('Banyuwangi Cycling', W/2, 84);
+
+    // Divider
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(W/2 - 80, 100, 160, 1);
+
+    // Stats
+    const stats = [
+      { label: 'Jarak', value: `${distance.toFixed(2)} km` },
+      { label: 'Waktu', value: formatTime(time) },
+      { label: 'Kec. Rata-rata', value: `${avgSpeed} km/h` },
+      { label: 'Kalori', value: `${caloriesBurned} kcal` },
+    ];
+
+    const startY = 180;
+    const gap = 170;
+    stats.forEach((s, i) => {
+      const y = startY + i * gap;
+      ctx.font = 'bold 18px Inter, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText(s.label.toUpperCase(), W/2, y);
+      ctx.font = `bold ${i === 0 ? 96 : 80}px Inter, Arial, sans-serif`;
+      ctx.fillStyle = i === 0 ? '#E05A2B' : '#ffffff';
+      ctx.fillText(s.value, W/2, y + (i === 0 ? 100 : 88));
+    });
+
+    // Bottom divider
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(W/2 - 80, H - 100, 160, 1);
+
+    // Bottom branding
+    ctx.font = 'bold 20px Inter, Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.textAlign = 'center';
+    ctx.fillText('kulino-pit.vercel.app', W/2, H - 60);
+
+    // Accent line bottom
+    ctx.fillStyle = '#E05A2B';
+    ctx.fillRect(0, H - 5, W, 5);
+
+    return canvas;
+  };
+
+  const handleDownloadCard = () => {
+    const canvas = generateShareImage();
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `kulino-pit-gowes-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
+  const handleShareWhatsApp = () => {
+    const canvas = generateShareImage();
+    if (!canvas) {
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`, '_blank');
+      return;
+    }
+    // Try Web Share API first (mobile)
+    canvas.toBlob(async (blob) => {
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], 'kulino-pit-gowes.png', { type: 'image/png' });
+        try {
+          await navigator.share({ files: [file], text: shareText, url: shareUrl });
+          return;
+        } catch(e) {}
+      }
+      // Fallback: download + open WA
+      handleDownloadCard();
+      setTimeout(() => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`, '_blank'), 500);
+    }, 'image/png');
+  };
+
+  const handleBgChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      setShareCardBg(img);
+      generateShareImage();
+    };
+    img.src = URL.createObjectURL(file);
+  };
+
+  // Re-render canvas preview when modal opens or bg changes
+  useEffect(() => {
+    if (showShareModal) {
+      setTimeout(() => generateShareImage(), 100);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showShareModal, shareCardBg, time, distance, speed, caloriesBurned]);
+
 
   return (
     <div className="space-y-6">
@@ -985,45 +1117,59 @@ function RideTrackerTab({ t, locale }) {
             </button>
           </div>
 
-          {/* Share Modal */}
+          {/* Share Modal — Strava Style */}
           {showShareModal && (
-            <div className="mt-4 p-5 rounded-2xl bg-gray-50 border border-gray-100 animate-fade-in">
-              <h4 className="font-display font-bold text-xs text-gray-900 mb-1 flex items-center gap-2">
-                <Share2 size={14} /> Bagikan Pencapaian Gowes Anda
-              </h4>
-              <p className="text-[10px] text-gray-500 mb-3">Pilih media sosial untuk pamer jarak tempuh:</p>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="mt-4 rounded-2xl bg-gray-950 border border-gray-800 overflow-hidden animate-fade-in">
+              {/* Card preview */}
+              <div className="relative flex items-center justify-center bg-gray-950 p-4 pb-2">
+                <canvas
+                  ref={shareCanvasRef}
+                  style={{ width: '100%', maxWidth: 270, borderRadius: 12, display: 'block' }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="p-4 space-y-3">
+                {/* Change background */}
                 <button
-                  onClick={() => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + '\n' + shareUrl)}`, '_blank')}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
+                  onClick={() => bgInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-600 text-gray-300 text-xs font-bold hover:border-gray-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  WhatsApp
+                  <span>🖼️</span>
+                  {shareCardBg ? 'Ganti Foto Background' : 'Tambah Foto Background'}
                 </button>
-                <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(shareText + '\n' + shareUrl);
-                    alert('Teks riwayat gowes berhasil disalin!');
-                  }}
-                  className="bg-pink-600 hover:bg-pink-700 text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
-                >
-                  Instagram
-                </button>
-                <button
-                  onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank')}
-                  className="bg-stone-900 hover:bg-black text-white rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
-                >
-                  X (Twitter)
-                </button>
-                <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(shareText + '\n' + shareUrl);
-                    alert('Tautan disalin ke clipboard!');
-                  }}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl py-2.5 px-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
-                >
-                  Salin Teks
-                </button>
+                <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={handleBgChange} />
+
+                {/* Share buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleShareWhatsApp}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    <span>💬</span> WhatsApp
+                  </button>
+                  <button
+                    onClick={handleDownloadCard}
+                    className="bg-pink-600 hover:bg-pink-700 text-white rounded-xl py-3 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    <span>📥</span> Simpan & Instagram
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank')}
+                    className="bg-stone-800 hover:bg-stone-700 text-white rounded-xl py-2.5 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    <span>𝕏</span> Twitter
+                  </button>
+                  <button
+                    onClick={handleDownloadCard}
+                    className="bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-2.5 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer transition-colors"
+                  >
+                    <span>⬇️</span> Download
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 text-center">Gambar diunduh → buka Instagram → pilih dari galeri</p>
               </div>
             </div>
           )}
