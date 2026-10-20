@@ -616,19 +616,85 @@ function RideTrackerTab({ t, locale }) {
   const [distance, setDistance] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
-  
-  // Default ke Banyuwangi, akan diupdate ke lokasi real saat halaman dimuat
+
   const [location, setLocation] = useState({ lat: -8.2192, lng: 114.3692 });
   const [speed, setSpeed] = useState(0);
   const [gpsStatus, setGpsStatus] = useState('MENUNGGU SINYAL GPS');
   const watchIdRef = useRef(null);
   const timerRef = useRef(null);
   const lastCoordsRef = useRef(null);
+  const lastTimeRef = useRef(null); // untuk hitung kecepatan manual
   const simulationRef = useRef(null);
   const simAngleRef = useRef(0);
   const simRadiusRef = useRef(0);
   const simCenterRef = useRef({ lat: -8.2192, lng: 114.3692 });
-  const realUserLocationRef = useRef(null); // Simpan lokasi real user
+  const realUserLocationRef = useRef(null);
+
+  // Leaflet map refs
+  const mapRef = useRef(null);       // Leaflet map instance
+  const markerRef = useRef(null);    // Leaflet marker instance
+  const mapContainerRef = useRef(null); // DOM div
+
+  // ── Init Leaflet map saat komponen mount ──
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Inject Leaflet CSS + JS jika belum ada
+    const initLeaflet = () => {
+      const L = window.L;
+      if (!L || !mapContainerRef.current || mapRef.current) return;
+      mapRef.current = L.map(mapContainerRef.current, {
+        center: [-8.2192, 114.3692],
+        zoom: 16,
+        zoomControl: true,
+        attributionControl: false,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(mapRef.current);
+      // Custom marker icon
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:22px;height:22px;background:#4BA3E3;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(75,163,227,0.7);position:relative">
+          <div style="width:8px;height:8px;background:white;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"></div>
+        </div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+      markerRef.current = L.marker([-8.2192, 114.3692], { icon }).addTo(mapRef.current);
+    };
+
+    if (!document.getElementById('leaflet-css')) {
+      const css = document.createElement('link');
+      css.id = 'leaflet-css';
+      css.rel = 'stylesheet';
+      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(css);
+    }
+    if (!document.getElementById('leaflet-js')) {
+      const script = document.createElement('script');
+      script.id = 'leaflet-js';
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = initLeaflet;
+      document.head.appendChild(script);
+    } else if (window.L) {
+      initLeaflet();
+    }
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, []);
+
+  // ── Update marker posisi saat location berubah ──
+  useEffect(() => {
+    if (mapRef.current && markerRef.current) {
+      markerRef.current.setLatLng([location.lat, location.lng]);
+      mapRef.current.panTo([location.lat, location.lng], { animate: true, duration: 1 });
+    }
+  }, [location]);
 
   // ── Ambil lokasi real user saat komponen mount ──
   useEffect(() => {
@@ -747,8 +813,10 @@ function RideTrackerTab({ t, locale }) {
             watchIdRef.current = navigator.geolocation.watchPosition(
               (position) => {
                 setGpsStatus('SINYAL GPS TERKUNCI');
-                const { latitude: lat, longitude: lng, speed: gpsSpd } = position.coords;
-                
+                const { latitude: lat, longitude: lng, speed: gpsSpd, accuracy } = position.coords;
+                const now = Date.now();
+
+                // Gunakan GPS speed jika tersedia, jika tidak hitung manual
                 if (gpsSpd !== null && gpsSpd !== undefined && gpsSpd >= 0) {
                   setSpeed((gpsSpd * 3.6).toFixed(1));
                 }
@@ -760,13 +828,23 @@ function RideTrackerTab({ t, locale }) {
                     lat,
                     lng
                   );
-                  // Filter noise GPS (minimal 5 meter pergerakan)
-                  if (dist > 0.005) {
+                  // Filter noise GPS (minimal 3 meter pergerakan, accuracy < 30m)
+                  if (dist > 0.003 && (accuracy == null || accuracy < 30)) {
                     setDistance(prev => prev + dist);
+                    // Hitung kecepatan dari jarak & waktu jika GPS tidak kasih speed
+                    if ((gpsSpd === null || gpsSpd === undefined) && lastTimeRef.current) {
+                      const dtSeconds = (now - lastTimeRef.current) / 1000;
+                      if (dtSeconds > 0) {
+                        const calculatedSpeed = (dist * 1000) / dtSeconds * 3.6; // km/h
+                        setSpeed(Math.min(calculatedSpeed, 60).toFixed(1)); // cap 60 km/h
+                      }
+                    }
                     lastCoordsRef.current = { lat, lng };
+                    lastTimeRef.current = now;
                   }
                 } else {
                   lastCoordsRef.current = { lat, lng };
+                  lastTimeRef.current = now;
                 }
 
                 setLocation({ lat, lng });
@@ -820,26 +898,31 @@ function RideTrackerTab({ t, locale }) {
     <div className="space-y-6">
       <div className="bg-white rounded-[26px] overflow-hidden shadow-sm border border-gray-100">
         
-        {/* OpenStreetMap Real-time Embed */}
-        <div className="h-64 sm:h-72 bg-gray-100 relative flex flex-col items-center justify-center overflow-hidden border-b border-gray-100">
-          <iframe
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            scrolling="no"
-            marginHeight="0"
-            marginWidth="0"
-            title="Cycling Route Map"
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${location.lng - 0.02},${location.lat - 0.02},${location.lng + 0.02},${location.lat + 0.02}&layer=mapnik&marker=${location.lat},${location.lng}`}
-            className="absolute inset-0 z-0"
-          />
+        {/* Leaflet Real-time Map */}
+        <div className="h-64 sm:h-72 bg-gray-100 relative overflow-hidden border-b border-gray-100">
+          {/* Map Container */}
+          <div ref={mapContainerRef} className="absolute inset-0 z-0" style={{ background: '#e8f0f7' }} />
+
+          {/* GPS Status Badge */}
           <div className="z-10 absolute top-4 left-4 bg-white/95 backdrop-blur-md rounded-2xl px-3.5 py-2 shadow-md border border-gray-100 flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${isTracking ? 'bg-emerald-500 animate-ping' : 'bg-gray-400'}`} />
+            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+              isTracking ? 'bg-emerald-500 animate-ping' : 
+              isLocating ? 'bg-amber-400 animate-pulse' : 
+              'bg-gray-400'
+            }`} />
             <div>
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400 leading-none">Status GPS</p>
               <p className="font-display font-black text-xs text-gray-800 leading-none mt-0.5">{gpsStatus}</p>
             </div>
           </div>
+
+          {/* Speed overlay saat tracking */}
+          {isTracking && (
+            <div className="z-10 absolute bottom-4 right-4 bg-[var(--color-primary)] text-white rounded-2xl px-3 py-2 shadow-md text-center">
+              <p className="font-display font-black text-lg leading-none">{speed || '0.0'}</p>
+              <p className="text-[9px] font-bold opacity-80">km/h</p>
+            </div>
+          )}
         </div>
 
         {/* Live Metrics Grid */}
