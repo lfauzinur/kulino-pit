@@ -7,7 +7,8 @@ import { Bike, Search, Settings, CheckCircle, XCircle, Star, Flame, Trash2, Uplo
 export default function AdminFleetPage() {
   const [fleet, setFleet] = useState(initialBikes);
   const [customBikes, setCustomBikes] = useState([]);
-  const [deletingId, setDeletingId] = useState(null); // confirm delete
+  const [deletingId, setDeletingId] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const imgInputRef = useRef(null);
   
   useEffect(() => {
@@ -64,14 +65,36 @@ export default function AdminFleetPage() {
     });
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Show local preview immediately
     const reader = new FileReader();
     reader.onload = (ev) => {
       setEditingBike(prev => ({ ...prev, image: ev.target.result }));
     };
     reader.readAsDataURL(file);
+
+    // Upload to Cloudinary in background
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'kulino-pit/bikes');
+
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+
+      if (res.ok && data.url) {
+        // Replace base64 with Cloudinary URL
+        setEditingBike(prev => ({ ...prev, image: data.url, imagePublicId: data.publicId }));
+      }
+    } catch (err) {
+      console.warn('Cloudinary upload failed, using local preview:', err);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleEditSave = (e) => {
@@ -282,22 +305,38 @@ export default function AdminFleetPage() {
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-2">Foto Sepeda</label>
                 <div 
-                  onClick={() => imgInputRef.current?.click()}
-                  className="relative w-full h-44 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden cursor-pointer hover:border-[var(--color-primary)] hover:bg-blue-50/30 transition-all group"
+                  onClick={() => !uploading && imgInputRef.current?.click()}
+                  className={`relative w-full h-44 rounded-2xl border-2 border-dashed overflow-hidden transition-all group ${uploading ? 'border-blue-300 bg-blue-50/30 cursor-wait' : 'border-gray-200 bg-gray-50 cursor-pointer hover:border-[var(--color-primary)] hover:bg-blue-50/30'}`}
                 >
                   {editingBike.image ? (
                     <>
                       <img src={editingBike.image} alt="Preview" className="w-full h-full object-contain p-2" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                        <Upload size={24} className="text-white" />
-                        <span className="text-white text-xs font-bold">Ganti Foto</span>
-                      </div>
+                      {/* Uploading overlay */}
+                      {uploading && (
+                        <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-2">
+                          <div className="w-8 h-8 border-3 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
+                          <span className="text-xs font-bold text-[var(--color-primary)]">Mengupload ke Cloudinary...</span>
+                        </div>
+                      )}
+                      {/* Cloudinary success badge */}
+                      {!uploading && editingBike.image?.includes('cloudinary') && (
+                        <div className="absolute top-2 left-2 bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle size={10} /> Cloudinary
+                        </div>
+                      )}
+                      {/* Hover replace */}
+                      {!uploading && (
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                          <Upload size={24} className="text-white" />
+                          <span className="text-white text-xs font-bold">Ganti Foto</span>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
                       <ImageIcon size={32} />
                       <span className="text-xs font-semibold">Klik untuk upload foto sepeda</span>
-                      <span className="text-[10px]">JPG, PNG, WEBP (maks 5MB)</span>
+                      <span className="text-[10px]">JPG, PNG, WEBP · Upload otomatis ke Cloudinary</span>
                     </div>
                   )}
                 </div>
