@@ -1,12 +1,14 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { bikes as initialBikes, formatCurrency, rentalDurations, getLowestPrice } from '@/lib/data';
+import { useState, useEffect, useRef } from 'react';
+import { bikes as initialBikes, formatCurrency } from '@/lib/data';
 import Image from 'next/image';
-import { Bike, Search, Settings, CheckCircle, XCircle, Star, Flame } from 'lucide-react';
+import { Bike, Search, Settings, CheckCircle, XCircle, Star, Flame, Trash2, Upload, ImageIcon } from 'lucide-react';
 
 export default function AdminFleetPage() {
   const [fleet, setFleet] = useState(initialBikes);
   const [customBikes, setCustomBikes] = useState([]);
+  const [deletingId, setDeletingId] = useState(null); // confirm delete
+  const imgInputRef = useRef(null);
   
   useEffect(() => {
     const saved = localStorage.getItem('customBikes');
@@ -25,19 +27,22 @@ export default function AdminFleetPage() {
 
   const persistFleet = (newFleet) => {
     setFleet(newFleet);
-    const newCustom = newFleet.map(b => b);
-    setCustomBikes(newCustom);
-    localStorage.setItem('customBikes', JSON.stringify(newCustom));
+    setCustomBikes(newFleet);
+    localStorage.setItem('customBikes', JSON.stringify(newFleet));
   };
 
   const toggleAvailability = (id) => {
-    const newFleet = fleet.map(b => b.id === id ? { ...b, available: !b.available } : b);
-    persistFleet(newFleet);
+    persistFleet(fleet.map(b => b.id === id ? { ...b, available: !b.available } : b));
   };
 
   const togglePopular = (id) => {
-    const newFleet = fleet.map(b => b.id === id ? { ...b, popular: !b.popular } : b);
+    persistFleet(fleet.map(b => b.id === id ? { ...b, popular: !b.popular } : b));
+  };
+
+  const handleDeleteBike = (id) => {
+    const newFleet = fleet.filter(b => b.id !== id);
     persistFleet(newFleet);
+    setDeletingId(null);
   };
 
   const handleAddNewBike = () => {
@@ -59,22 +64,29 @@ export default function AdminFleetPage() {
     });
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setEditingBike(prev => ({ ...prev, image: ev.target.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleEditSave = (e) => {
     e.preventDefault();
     let newCustomBikes;
-    
     if (editingBike.id) {
-      setFleet(prev => prev.map(b => b.id === editingBike.id ? editingBike : b));
+      const newFleet = fleet.map(b => b.id === editingBike.id ? editingBike : b);
+      setFleet(newFleet);
       newCustomBikes = customBikes.map(b => b.id === editingBike.id ? editingBike : b);
-      if (!newCustomBikes.some(b => b.id === editingBike.id)) {
-        newCustomBikes.push(editingBike);
-      }
+      if (!newCustomBikes.some(b => b.id === editingBike.id)) newCustomBikes.push(editingBike);
     } else {
       const newBike = { ...editingBike, id: 'bike-' + Date.now() };
       setFleet(prev => [newBike, ...prev]);
       newCustomBikes = [newBike, ...customBikes];
     }
-    
     setCustomBikes(newCustomBikes);
     localStorage.setItem('customBikes', JSON.stringify(newCustomBikes));
     setEditingBike(null);
@@ -149,7 +161,7 @@ export default function AdminFleetPage() {
         {filteredFleet.map(bike => (
           <div key={bike.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col transition-all hover:shadow-md hover:-translate-y-1">
             <div className="relative aspect-video bg-gray-50 border-b border-gray-100 p-4">
-              <Image src={bike.image} alt={bike.name} fill className="object-contain p-2" />
+              <Image src={bike.image} alt={bike.name} fill className="object-contain p-2" unoptimized={bike.image?.startsWith('data:')} />
               <div className="absolute top-3 left-3 flex gap-2">
                 {bike.popular && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm bg-amber-50 text-amber-600 border border-amber-200">
@@ -174,9 +186,14 @@ export default function AdminFleetPage() {
                   <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-primary)]">{bike.category}</span>
                   <h3 className="font-display font-black text-sm text-gray-900 mt-0.5">{bike.name}</h3>
                 </div>
-                <button onClick={() => setEditingBike(bike)} className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="Edit Bike">
-                  <Settings size={16} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setEditingBike(bike)} className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="Edit Bike">
+                    <Settings size={15} />
+                  </button>
+                  <button onClick={() => setDeletingId(bike.id)} className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus Sepeda">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
               
               {/* Multi-tier pricing display */}
@@ -235,12 +252,64 @@ export default function AdminFleetPage() {
         </div>
       )}
 
+      {/* Delete Confirm Modal */}
+      {deletingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl text-center">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={24} className="text-red-500" />
+            </div>
+            <h3 className="font-display font-black text-lg text-gray-900 mb-2">Hapus Sepeda?</h3>
+            <p className="text-sm text-gray-500 mb-5">
+              Sepeda <strong>{fleet.find(b => b.id === deletingId)?.name}</strong> akan dihapus permanen dari armada.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeletingId(null)} className="btn flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50">Batal</button>
+              <button onClick={() => handleDeleteBike(deletingId)} className="btn flex-1 bg-red-500 hover:bg-red-600 text-white">Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit / Add Bike Modal */}
       {editingBike && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 className="font-display font-black text-xl text-gray-900 mb-4">{editingBike.id ? 'Edit Bike Details' : 'Add New Bike'}</h3>
             <form onSubmit={handleEditSave} className="space-y-4">
+              
+              {/* ─── Image Upload ─── */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-2">Foto Sepeda</label>
+                <div 
+                  onClick={() => imgInputRef.current?.click()}
+                  className="relative w-full h-44 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 overflow-hidden cursor-pointer hover:border-[var(--color-primary)] hover:bg-blue-50/30 transition-all group"
+                >
+                  {editingBike.image ? (
+                    <>
+                      <img src={editingBike.image} alt="Preview" className="w-full h-full object-contain p-2" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                        <Upload size={24} className="text-white" />
+                        <span className="text-white text-xs font-bold">Ganti Foto</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
+                      <ImageIcon size={32} />
+                      <span className="text-xs font-semibold">Klik untuk upload foto sepeda</span>
+                      <span className="text-[10px]">JPG, PNG, WEBP (maks 5MB)</span>
+                    </div>
+                  )}
+                </div>
+                <input 
+                  ref={imgInputRef} 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload}
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Bike Name</label>
                 <input 
@@ -258,53 +327,23 @@ export default function AdminFleetPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Sewa 2 Jam</label>
-                    <input 
-                      type="number" 
-                      required
-                      className="clean-input text-xs"
-                      value={editingBike.price2h || 0}
-                      onChange={e => setEditingBike({...editingBike, price2h: parseInt(e.target.value) || 0})}
-                    />
+                    <input type="number" required className="clean-input text-xs" value={editingBike.price2h || 0} onChange={e => setEditingBike({...editingBike, price2h: parseInt(e.target.value) || 0})} />
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Sewa 3 Jam</label>
-                    <input 
-                      type="number" 
-                      required
-                      className="clean-input text-xs"
-                      value={editingBike.price3h || 0}
-                      onChange={e => setEditingBike({...editingBike, price3h: parseInt(e.target.value) || 0})}
-                    />
+                    <input type="number" required className="clean-input text-xs" value={editingBike.price3h || 0} onChange={e => setEditingBike({...editingBike, price3h: parseInt(e.target.value) || 0})} />
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Sewa 4 Jam</label>
-                    <input 
-                      type="number" 
-                      required
-                      className="clean-input text-xs"
-                      value={editingBike.price4h || 0}
-                      onChange={e => setEditingBike({...editingBike, price4h: parseInt(e.target.value) || 0})}
-                    />
+                    <input type="number" required className="clean-input text-xs" value={editingBike.price4h || 0} onChange={e => setEditingBike({...editingBike, price4h: parseInt(e.target.value) || 0})} />
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Sewa 6 Jam</label>
-                    <input 
-                      type="number" 
-                      required
-                      className="clean-input text-xs"
-                      value={editingBike.price6h || 0}
-                      onChange={e => setEditingBike({...editingBike, price6h: parseInt(e.target.value) || 0})}
-                    />
+                    <input type="number" required className="clean-input text-xs" value={editingBike.price6h || 0} onChange={e => setEditingBike({...editingBike, price6h: parseInt(e.target.value) || 0})} />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[9px] font-bold text-blue-500 uppercase mb-1">Sewa Sehari (Full Day)</label>
-                    <input 
-                      type="number" 
-                      required
-                      className="clean-input text-xs !border-blue-200 focus:!border-blue-400"
-                      value={editingBike.pricePerDay}
-                      onChange={e => setEditingBike({...editingBike, pricePerDay: parseInt(e.target.value) || 0})}
-                    />
+                    <input type="number" required className="clean-input text-xs !border-blue-200 focus:!border-blue-400" value={editingBike.pricePerDay} onChange={e => setEditingBike({...editingBike, pricePerDay: parseInt(e.target.value) || 0})} />
                   </div>
                 </div>
               </div>
@@ -312,11 +351,7 @@ export default function AdminFleetPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Category</label>
-                  <select 
-                    className="clean-input"
-                    value={editingBike.category}
-                    onChange={e => setEditingBike({...editingBike, category: e.target.value})}
-                  >
+                  <select className="clean-input" value={editingBike.category} onChange={e => setEditingBike({...editingBike, category: e.target.value})}>
                     <option value="roadbike">Roadbike</option>
                     <option value="mtb">MTB</option>
                     <option value="folding">Folding</option>
@@ -365,19 +400,11 @@ export default function AdminFleetPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1">Deskripsi (ID)</label>
-                  <textarea 
-                    className="clean-input text-xs" rows="2"
-                    value={editingBike.description?.id || ''}
-                    onChange={e => setEditingBike({...editingBike, description: {...editingBike.description, id: e.target.value}})}
-                  />
+                  <textarea className="clean-input text-xs" rows="2" value={editingBike.description?.id || ''} onChange={e => setEditingBike({...editingBike, description: {...editingBike.description, id: e.target.value}})} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 mb-1">Description (EN)</label>
-                  <textarea 
-                    className="clean-input text-xs" rows="2"
-                    value={editingBike.description?.en || ''}
-                    onChange={e => setEditingBike({...editingBike, description: {...editingBike.description, en: e.target.value}})}
-                  />
+                  <textarea className="clean-input text-xs" rows="2" value={editingBike.description?.en || ''} onChange={e => setEditingBike({...editingBike, description: {...editingBike.description, en: e.target.value}})} />
                 </div>
               </div>
 
