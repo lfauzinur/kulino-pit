@@ -55,7 +55,7 @@ export default function TripTourPage() {
                     <Link href={`/trip-tour/${tour.slug}`} className="brutal-btn bg-white border-2 border-black hover:bg-gray-50 text-black px-6 py-3 text-xs w-full sm:w-auto text-center">
                       {locale === 'id' ? 'Detail Tour' : 'Tour Detail'}
                     </Link>
-                    <Link href="/booking" className="brutal-btn brutal-btn-primary px-6 py-3 text-xs w-full sm:w-auto text-center">
+                    <Link href={`/trip-tour/${tour.slug}/booking`} className="brutal-btn brutal-btn-primary px-6 py-3 text-xs w-full sm:w-auto text-center">
                       {t('tours.bookTour')} →
                     </Link>
                   </div>

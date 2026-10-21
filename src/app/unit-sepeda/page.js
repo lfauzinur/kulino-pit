@@ -91,9 +91,15 @@ export default function UnitSepedaPage() {
                         </span>
                       )}
                     </div>
-                    <span className={`absolute top-3 right-3 brutal-badge text-[8px] ${bike.available ? 'bg-[var(--color-green-light)] text-[var(--color-green)]' : 'bg-[var(--color-red-light)] text-[var(--color-red)]'}`}>
-                      ● {bike.available ? t('bikes.available') : t('bikes.booked')}
-                    </span>
+                    {/* Unavailable overlay */}
+                    {!bike.available && (
+                      <div className="absolute inset-0 bg-gray-900/60 flex flex-col items-center justify-center z-10">
+                        <div className="bg-red-600 text-white font-display font-black text-lg px-6 py-2 rounded-full shadow-lg flex items-center gap-2 rotate-[-5deg]">
+                          🔒 TERPESAN
+                        </div>
+                        <p className="text-white text-xs font-semibold mt-3 bg-black/50 px-3 py-1 rounded-full">Tidak tersedia saat ini</p>
+                      </div>
+                    )}
                   </div>
                   <div className="p-5">
                     <h3 className="font-display font-black text-base">{bike.name}</h3>
@@ -131,12 +137,18 @@ export default function UnitSepedaPage() {
                         <p className="text-[9px] text-[var(--color-gray-500)] mb-0.5">{locale === 'id' ? 'Mulai dari' : 'Starting from'}</p>
                         <p className="font-display font-black text-xl text-[var(--color-orange)]">{formatCurrency(lowestPrice)}</p>
                       </div>
-                      <Link
-                        href={bike.available ? '/booking' : '#'}
-                        className={`brutal-btn px-4 py-2.5 text-[10px] ${bike.available ? 'brutal-btn-primary' : 'brutal-btn-secondary opacity-50 cursor-not-allowed'}`}
-                      >
-                        {t('bikes.checkAvail')}
-                      </Link>
+                      {bike.available ? (
+                        <Link
+                          href="/booking"
+                          className="brutal-btn brutal-btn-primary px-4 py-2.5 text-[10px]"
+                        >
+                          {t('bikes.checkAvail')}
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-600 font-bold text-[10px] px-4 py-2.5 rounded">
+                          🔒 Sedang Terpesan
+                        </span>
+                      )}
                     </div>
                   </div>
                 </article>

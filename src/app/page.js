@@ -196,7 +196,7 @@ function HowItWorks({ t }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-10">
               {steps.map((step, index) => (
                 <div key={index} className="relative">
-                  <span className="block text-4xl lg:text-5xl font-display font-black text-[var(--color-primary-soft)] mb-2">
+                  <span className="block text-4xl lg:text-5xl font-display font-black text-[var(--color-primary)] opacity-30 mb-2">
                     {step.num}
                   </span>
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{step.title}</h3>

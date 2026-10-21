@@ -147,8 +147,8 @@ export default function TourDetail({ params }) {
                 </ul>
               </div>
 
-              <Link href="/booking" className="btn btn-primary w-full py-4 text-lg shadow-md">
-                {locale === 'id' ? 'Booking Sekarang' : 'Book Now'}
+              <Link href={`/trip-tour/${tour.slug}/booking`} className="btn btn-primary w-full py-4 text-lg shadow-md">
+                {locale === 'id' ? 'Booking Sekarang →' : 'Book Now →'}
               </Link>
             </div>
 

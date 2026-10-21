@@ -72,23 +72,26 @@ export default function LayananPage() {
         </div>
 
         {/* Manpower Roles */}
-        <div className="brutal-card !bg-[var(--color-black)] text-white p-8 sm:p-10 !shadow-[var(--shadow-brutal-lg)]">
-          <h2 className="font-display font-black text-2xl mb-8 text-center">{t('services.manpower.title')}</h2>
+        <div className="brutal-card bg-[var(--color-primary-soft)] border-[var(--color-primary)]/20 p-8 sm:p-10 !shadow-[var(--shadow-brutal-lg)]">
+          <div className="text-center mb-8">
+            <h2 className="font-display font-black text-2xl text-gray-900">{t('services.manpower.title')}</h2>
+            <p className="text-sm text-gray-500 mt-2">Tim profesional kami siap mendukung setiap event bersepeda Anda</p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {manpowerRoles.map((role, i) => (
-              <div key={i} className="border-2 border-[var(--color-gray-700)] p-5 rounded-xl hover:border-[var(--color-orange)] transition-colors group">
+              <div key={i} className="bg-white rounded-2xl p-5 border border-[var(--color-primary)]/10 hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: role.color + '20', color: role.color }}>
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: role.color + '15', color: role.color }}>
                     {role.icon}
                   </div>
-                  <h3 className="font-display font-black text-sm group-hover:text-[var(--color-orange)] transition-colors">{role.role}</h3>
+                  <h3 className="font-display font-black text-sm text-gray-900">{role.role}</h3>
                 </div>
-                <p className="text-xs text-gray-400 leading-5">{role.desc}</p>
+                <p className="text-xs text-gray-500 leading-5">{role.desc}</p>
               </div>
             ))}
           </div>
           <div className="text-center mt-8">
-            <a href="https://wa.me/6281234567890" className="brutal-btn brutal-btn-primary px-8 py-4 text-sm">
+            <a href="https://wa.me/6281234567890" className="btn btn-primary px-8 py-4 text-sm inline-flex items-center gap-2 shadow-md">
               {t('services.consultWhatsApp')} 💬
             </a>
           </div>
