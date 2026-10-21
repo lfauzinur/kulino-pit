@@ -25,8 +25,24 @@ import {
   Map as MapIcon, MousePointerClick, Users, CreditCard, LogOut,
   Share2, Link2, RotateCcw, Gift, AlertTriangle, ChevronRight,
   Sparkles, Compass, ArrowUpRight, Flame, Home, QrCode, ArrowLeft, Download, ShieldCheck,
-  Navigation2, Route, History, Play, Square, Timer, Tag, HardHat, Shirt
+  Navigation2, Route, History, Play, Square, Timer, Tag, HardHat, Shirt, X
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+
+/* ─── Real QR Code Component ─── */
+function MemberQRCode({ memberId }) {
+  const qrValue = `kulino-pit://member/${memberId}`;
+  return (
+    <QRCodeSVG
+      value={qrValue}
+      size={140}
+      bgColor="#ffffff"
+      fgColor="#0f172a"
+      level="M"
+      includeMargin={false}
+    />
+  );
+}
 
 /* ─── Active Booking Countdown Timer ─── */
 function ActiveBookingTimer({ booking, locale, t }) {
@@ -570,36 +586,47 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
         </div>
       </div>
 
-      {/* QR Code Modal for Check-in */}
+      {/* QR Code Modal for Check-in — Real QR, centered, close on backdrop */}
       {showQRModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl p-6 max-w-xs w-full text-center shadow-2xl relative animate-slide-up border border-gray-100">
-            <div className="w-12 h-12 rounded-2xl bg-sky-50 text-[var(--color-primary)] flex items-center justify-center mx-auto mb-3">
-              <QrCode size={26} />
+        <div
+          className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setShowQRModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 max-w-[320px] w-full text-center shadow-2xl relative animate-slide-up border border-gray-100"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowQRModal(false)}
+              className="absolute top-3 right-3 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors"
+            >
+              <X size={14} />
+            </button>
+
+            <div className="w-10 h-10 rounded-2xl bg-sky-50 text-[var(--color-primary)] flex items-center justify-center mx-auto mb-2">
+              <QrCode size={22} />
             </div>
-            <h3 className="font-display font-black text-lg text-gray-900">QR Check-in Member</h3>
-            <p className="text-xs text-gray-500 mt-1 mb-5">
-              Tunjukkan QR Code ini kepada Road Captain atau kasir di Pitstop Kulino House.
+            <h3 className="font-display font-black text-base text-gray-900">QR Check-in Member</h3>
+            <p className="text-[11px] text-gray-500 mt-1 mb-4">
+              Tunjukkan ke kasir atau Road Captain Kulino House.
             </p>
 
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-center justify-center mb-4">
-              <div className="w-44 h-44 bg-white p-3 rounded-xl shadow-inner flex flex-col items-center justify-center border border-gray-200">
-                <QrCode size={130} className="text-gray-900" strokeWidth={2} />
-                <p className="font-mono font-bold text-[10px] text-gray-500 mt-1.5 tracking-wider">
-                  {d.memberId}
-                </p>
-              </div>
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col items-center justify-center mb-3">
+              <MemberQRCode memberId={d.memberId} />
+              <p className="font-mono font-bold text-[10px] text-gray-400 mt-2 tracking-wider">
+                {d.memberId}
+              </p>
             </div>
 
-            <p className="text-[10px] text-emerald-600 font-bold mb-4 flex items-center justify-center gap-1">
-              <ShieldCheck size={13} /> Member VIP Terverifikasi
+            <p className="text-[10px] text-emerald-600 font-bold mb-3 flex items-center justify-center gap-1">
+              <ShieldCheck size={12} /> Member VIP Terverifikasi
             </p>
 
             <button
               onClick={() => setShowQRModal(false)}
-              className="btn btn-primary w-full py-2.5 text-xs font-bold cursor-pointer"
+              className="btn btn-primary w-full py-2 text-xs font-bold cursor-pointer"
             >
-              Tutup QR Code
+              Tutup
             </button>
           </div>
         </div>
@@ -2248,18 +2275,18 @@ export default function MemberPage() {
       <PWAInstallBanner />
 
       {/* Hero Header (Gambar 2: Warna senada & harmonis dengan UI) */}
-      <div className="relative h-[280px] sm:h-[300px] w-full bg-slate-900 rounded-b-[36px] overflow-hidden shadow-lg">
+      <div className="relative w-full bg-slate-900 rounded-b-[32px] overflow-hidden shadow-lg" style={{ minHeight: 'clamp(155px, 26vh, 230px)' }}>
         <Image
           src="/images/hero-banner.png"
           alt="Kulino Pit Background"
           fill
-          className="object-cover opacity-50 mix-blend-overlay"
+          className="object-cover opacity-40"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-slate-900/40 to-slate-950/85" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-slate-900/60 to-slate-950/95" />
 
         {/* Top Floating App Bar */}
-        <div className="absolute top-0 left-0 right-0 p-5 sm:p-6 z-10 flex justify-between items-center pt-6 sm:pt-8">
+        <div className="absolute top-0 left-0 right-0 px-4 pt-4 sm:px-6 sm:pt-5 z-10 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('dashboard')}
@@ -2299,19 +2326,18 @@ export default function MemberPage() {
           </div>
         </div>
 
-        {/* Hero User Greetings */}
-        <div className="absolute bottom-14 left-5 right-5 sm:left-8 sm:right-8 z-10">
-          <div className="text-white font-black text-xl sm:text-2xl tracking-tight mb-2 italic drop-shadow-md flex items-center gap-1.5">
-            <span className="text-[var(--color-primary)]">KULINO PIT</span>
-            <span className="text-white/90">BANYUWANGI</span>
+        {/* Hero User Greetings — compact, always visible */}
+        <div className="relative z-10 px-4 sm:px-8 pt-12 pb-6 sm:pt-14 sm:pb-8">
+          <div className="text-white font-black text-lg sm:text-xl tracking-tight mb-1 italic drop-shadow-lg flex items-center gap-1.5">
+            <span className="text-sky-300">KULINO PIT</span>
+            <span className="text-white">BANYUWANGI</span>
           </div>
-          <p className="text-white/80 text-xs font-medium">Selamat datang kembali,</p>
-          <div className="flex items-center gap-2.5 mt-0.5">
-            <h1 className="text-white font-extrabold text-2xl drop-shadow-md">
+          <p className="text-white text-xs font-semibold mb-1 opacity-90">Selamat datang kembali,</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-white font-extrabold text-xl sm:text-2xl drop-shadow-lg leading-none">
               {memberProfile?.name || memberData.name}
             </h1>
-            {/* Gambar 2: Badge GOLD senada & elegan */}
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase backdrop-blur-sm">
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-400/25 text-amber-200 border border-amber-400/50 text-[10px] font-black uppercase backdrop-blur-sm">
               {memberData.level}
             </span>
           </div>

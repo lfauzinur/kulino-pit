@@ -1,10 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   X, Clock, Calendar, Store, Truck, CheckCircle2, CreditCard, 
   Sparkles, ShieldCheck, Copy, ArrowRight, Check, HardHat, Lightbulb, 
-  Briefcase, Map, Shirt, Wrench 
+  Briefcase, Map, Shirt, Wrench, QrCode, Banknote
 } from 'lucide-react';
 import { rentalDurations, accessories, formatCurrency, getPriceByDuration } from '@/lib/data';
 
@@ -179,23 +180,51 @@ export default function InAppBookingModal({ bike, onClose, onSuccess }) {
 
               {/* Payment Details */}
               <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 text-left">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-sky-800 mb-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-sky-800 mb-3">
                   Info Pembayaran ({bookingResult.paymentMethod})
                 </p>
-                <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-sky-200">
-                  <div>
-                    <p className="text-xs font-bold text-gray-800">
-                      {bookingResult.paymentMethod === 'QRIS' ? 'QRIS Kulino Pit ID' : 'BCA 1800-8899-22 a/n Kulino House'}
-                    </p>
-                    <p className="text-[10px] text-gray-400">Transfer tepat hingga digit terakhir</p>
+
+                {bookingResult.paymentMethod === 'QRIS' ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="bg-white p-3 rounded-2xl border border-sky-100 shadow-sm inline-block">
+                      <QRCodeSVG
+                        value={`kulino-pit://pay?booking=${bookingResult.id}&amount=${bookingResult.total}`}
+                        size={140}
+                        bgColor="#ffffff"
+                        fgColor="#0f172a"
+                        level="M"
+                      />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-bold text-gray-800">Scan QRIS Kulino Pit</p>
+                      <p className="text-[10px] text-gray-500">Bayar tepat <strong>{formatCurrency(bookingResult.total)}</strong></p>
+                    </div>
+                    <button
+                      onClick={() => handleCopyText(bookingResult.total.toString())}
+                      className="btn px-4 py-1.5 text-[10px] font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 flex items-center gap-1"
+                    >
+                      <Copy size={12} /> {copied ? 'Tersalin!' : 'Salin Nominal'}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => handleCopyText(bookingResult.total.toString())}
-                    className="btn px-3 py-1.5 text-[10px] font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 flex items-center gap-1"
-                  >
-                    <Copy size={12} /> {copied ? 'Tersalin' : 'Salin'}
-                  </button>
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-sky-200">
+                      <div>
+                        <p className="text-xs font-bold text-gray-800">BCA 1800-8899-22</p>
+                        <p className="text-[10px] text-gray-500">a/n Kulino House Banyuwangi</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyText('1800889922')}
+                        className="btn px-3 py-1.5 text-[10px] font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 flex items-center gap-1"
+                      >
+                        <Copy size={12} /> {copied ? 'OK!' : 'Salin'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-500 text-center">
+                      Transfer tepat <strong className="text-gray-800">{formatCurrency(bookingResult.total)}</strong> (kode unik sudah termasuk)
+                    </p>
+                  </div>
+                )}
               </div>
 
               <button
@@ -383,26 +412,38 @@ export default function InAppBookingModal({ bike, onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* STEP 4: METODE PEMBAYARAN */}
+              {/* STEP 4: METODE PEMBAYARAN — QRIS & Transfer saja */}
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                   4. METODE PEMBAYARAN
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['QRIS', 'Bank Transfer', 'E-Wallet'].map((method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setPaymentMethod(method)}
-                      className={`py-2 px-2 text-xs font-bold rounded-xl border text-center transition-all ${
-                        paymentMethod === method
-                          ? 'bg-sky-50 border-[var(--color-primary)] text-[var(--color-primary)] shadow-xs'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {method}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('QRIS')}
+                    className={`py-3 px-3 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 ${
+                      paymentMethod === 'QRIS'
+                        ? 'bg-sky-50 border-[var(--color-primary)] text-[var(--color-primary)] shadow-sm'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <QrCode size={20} />
+                    <span className="text-xs font-bold">QRIS</span>
+                    <span className="text-[9px] text-gray-400">Scan bayar instan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('Transfer Bank')}
+                    className={`py-3 px-3 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 ${
+                      paymentMethod === 'Transfer Bank'
+                        ? 'bg-sky-50 border-[var(--color-primary)] text-[var(--color-primary)] shadow-sm'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Banknote size={20} />
+                    <span className="text-xs font-bold">Transfer Bank</span>
+                    <span className="text-[9px] text-gray-400">BCA / Mandiri / BRI</span>
+                  </button>
                 </div>
               </div>
 
