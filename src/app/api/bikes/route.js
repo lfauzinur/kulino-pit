@@ -11,7 +11,7 @@ function rowToBike(row) {
     category: row.category,
     image: row.image,
     imagePublicId: row.image_public_id,
-    frameSize: row.frame_size || ['M'],
+    frameSize: Array.isArray(row.frame_size) ? row.frame_size : (row.frame_size ? JSON.parse(row.frame_size) : ['M']),
     pricePerDay: row.price_per_day,
     price2h: row.price_2h,
     price3h: row.price_3h,
@@ -69,7 +69,7 @@ export async function POST(request) {
         spec_weight, spec_groupset, spec_brake, spec_wheel,
         sort_order
       ) VALUES (
-        ${name}, ${category}, ${image}, ${imagePublicId || null}, ${JSON.stringify(frameSize)},
+        ${name}, ${category}, ${image}, ${imagePublicId || null}, ${JSON.stringify(frameSize)}::jsonb,
         ${pricePerDay}, ${price2h}, ${price3h}, ${price4h}, ${price6h},
         ${popular}, ${available},
         ${description.id || ''}, ${description.en || ''},

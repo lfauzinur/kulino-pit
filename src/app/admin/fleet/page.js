@@ -415,11 +415,24 @@ export default function AdminFleetPage() {
       {/* Edit / Add Bike Modal */}
       {editingBike && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 className="font-display font-black text-xl text-gray-900 mb-1">{editingBike.id ? 'Edit Bike' : 'Add New Bike'}</h3>
-            <p className="text-xs text-green-600 mb-4 flex items-center gap-1">
-              <Database size={11} /> Tersimpan otomatis ke database
-            </p>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col">
+            {/* Modal Header dengan tombol X */}
+            <div className="flex items-start justify-between p-6 pb-0">
+              <div>
+                <h3 className="font-display font-black text-xl text-gray-900">{editingBike.id ? 'Edit Bike' : 'Add New Bike'}</h3>
+                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                  <Database size={11} /> Tersimpan otomatis ke database
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingBike(null)}
+                className="ml-4 mt-1 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+              >
+                <span className="text-xl leading-none">&times;</span>
+              </button>
+            </div>
+            <div className="overflow-y-auto p-6 pt-4">
             <form onSubmit={handleEditSave} className="space-y-4">
 
               {/* Image Upload */}
@@ -573,13 +586,14 @@ export default function AdminFleetPage() {
 
               <div className="flex gap-2 pt-4">
                 <button type="button" onClick={() => setEditingBike(null)} className="btn flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50">
-                  Cancel
+                  Batal
                 </button>
-                <button type="submit" disabled={saving} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
+                <button type="submit" disabled={saving || uploading} className="btn btn-primary flex-1 flex items-center justify-center gap-2">
                   {saving ? <><RefreshCw size={14} className="animate-spin" /> Menyimpan...</> : <><Database size={14} /> Simpan ke Database</>}
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

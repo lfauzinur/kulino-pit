@@ -10,7 +10,7 @@ function rowToBike(row) {
     category: row.category,
     image: row.image,
     imagePublicId: row.image_public_id,
-    frameSize: row.frame_size || ['M'],
+    frameSize: Array.isArray(row.frame_size) ? row.frame_size : (row.frame_size ? JSON.parse(row.frame_size) : ['M']),
     pricePerDay: row.price_per_day,
     price2h: row.price_2h,
     price3h: row.price_3h,
@@ -28,45 +28,64 @@ function rowToBike(row) {
   };
 }
 
-// PUT /api/bikes/[id] → update sepeda
+// PUT /api/bikes/[id] → update SEMUA field langsung (no COALESCE trick)
 export async function PUT(request, { params }) {
   try {
     const id = parseInt(params.id);
     const body = await request.json();
-    const {
-      name, category, image, imagePublicId, frameSize,
-      pricePerDay, price2h, price3h, price4h, price6h,
-      popular, available, description = {}, specs = {},
-    } = body;
+
+    // Ambil data lama dulu sebagai fallback
+    const current = await sql`SELECT * FROM bikes WHERE id = ${id}`;
+    if (current.length === 0) {
+      return NextResponse.json({ error: 'Bike not found' }, { status: 404 });
+    }
+    const cur = current[0];
+
+    // Merge: pakai nilai baru kalau ada, fallback ke nilai lama
+    const name        = body.name        ?? cur.name;
+    const category    = body.category    ?? cur.category;
+    const image       = (body.image && body.image.trim() !== '') ? body.image : cur.image;
+    const imagePublicId = body.imagePublicId ?? cur.image_public_id;
+    const frameSizeArr  = Array.isArray(body.frameSize) ? body.frameSize : (cur.frame_size || ['M']);
+    const pricePerDay = body.pricePerDay  ?? cur.price_per_day;
+    const price2h     = body.price2h      ?? cur.price_2h;
+    const price3h     = body.price3h      ?? cur.price_3h;
+    const price4h     = body.price4h      ?? cur.price_4h;
+    const price6h     = body.price6h      ?? cur.price_6h;
+    const popular     = typeof body.popular   === 'boolean' ? body.popular   : cur.popular;
+    const available   = typeof body.available === 'boolean' ? body.available : cur.available;
+    const descId      = body.description?.id  ?? cur.description_id;
+    const descEn      = body.description?.en  ?? cur.description_en;
+    const specWeight  = body.specs?.weight    ?? cur.spec_weight;
+    const specGroup   = body.specs?.groupset  ?? cur.spec_groupset;
+    const specBrake   = body.specs?.brake     ?? cur.spec_brake;
+    const specWheel   = body.specs?.wheel     ?? cur.spec_wheel;
 
     const rows = await sql`
       UPDATE bikes SET
-        name = COALESCE(${name}, name),
-        category = COALESCE(${category}, category),
-        image = COALESCE(${image}, image),
-        image_public_id = COALESCE(${imagePublicId || null}, image_public_id),
-        frame_size = COALESCE(${frameSize ? JSON.stringify(frameSize) : null}, frame_size),
-        price_per_day = COALESCE(${pricePerDay}, price_per_day),
-        price_2h = COALESCE(${price2h}, price_2h),
-        price_3h = COALESCE(${price3h}, price_3h),
-        price_4h = COALESCE(${price4h}, price_4h),
-        price_6h = COALESCE(${price6h}, price_6h),
-        popular = COALESCE(${typeof popular === 'boolean' ? popular : null}, popular),
-        available = COALESCE(${typeof available === 'boolean' ? available : null}, available),
-        description_id = COALESCE(${description.id ?? null}, description_id),
-        description_en = COALESCE(${description.en ?? null}, description_en),
-        spec_weight = COALESCE(${specs.weight ?? null}, spec_weight),
-        spec_groupset = COALESCE(${specs.groupset ?? null}, spec_groupset),
-        spec_brake = COALESCE(${specs.brake ?? null}, spec_brake),
-        spec_wheel = COALESCE(${specs.wheel ?? null}, spec_wheel),
-        updated_at = NOW()
+        name          = ${name},
+        category      = ${category},
+        image         = ${image},
+        image_public_id = ${imagePublicId},
+        frame_size    = ${JSON.stringify(frameSizeArr)}::jsonb,
+        price_per_day = ${pricePerDay},
+        price_2h      = ${price2h},
+        price_3h      = ${price3h},
+        price_4h      = ${price4h},
+        price_6h      = ${price6h},
+        popular       = ${popular},
+        available     = ${available},
+        description_id  = ${descId},
+        description_en  = ${descEn},
+        spec_weight   = ${specWeight},
+        spec_groupset = ${specGroup},
+        spec_brake    = ${specBrake},
+        spec_wheel    = ${specWheel},
+        updated_at    = NOW()
       WHERE id = ${id}
       RETURNING *
     `;
 
-    if (rows.length === 0) {
-      return NextResponse.json({ error: 'Bike not found' }, { status: 404 });
-    }
     return NextResponse.json(rowToBike(rows[0]));
   } catch (error) {
     console.error('PUT /api/bikes/[id] error:', error);
@@ -78,13 +97,10 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const id = parseInt(params.id);
-    
-    // Ambil publicId untuk hapus dari Cloudinary juga
     const bike = await sql`SELECT image_public_id FROM bikes WHERE id = ${id}`;
     if (bike.length === 0) {
       return NextResponse.json({ error: 'Bike not found' }, { status: 404 });
     }
-
     await sql`DELETE FROM bikes WHERE id = ${id}`;
     return NextResponse.json({ success: true, deletedId: id });
   } catch (error) {
