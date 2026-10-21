@@ -345,16 +345,13 @@ export default function BookingPage() {
   const [customerInfo, setCustomerInfo] = useState({ paymentMethod: 'Bank Transfer' });
   const [showConfirm, setShowConfirm] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState(null);
-  const [bikesList, setBikesList] = useState(initialBikes);
+  const [bikesList, setBikesList] = useState([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('customBikes');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      const merged = initialBikes.map(b => parsed.find(p => p.id === b.id) || b);
-      const newlyAdded = parsed.filter(p => !initialBikes.some(b => b.id === p.id));
-      setBikesList([...newlyAdded, ...merged]);
-    }
+    fetch('/api/bikes')
+      .then(r => r.json())
+      .then(data => setBikesList(data))
+      .catch(console.error);
   }, []);
 
   const steps = [t('booking.step1'), t('booking.step2'), t('booking.step3'), t('booking.step4')];

@@ -1,14 +1,15 @@
 'use client';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
-import { bikes, testimonials, tours, formatCurrency, getLowestPrice } from '@/lib/data';
+import { testimonials, tours, formatCurrency, getLowestPrice } from '@/lib/data';
 import { MapPin, Calendar, Search, Map, CreditCard, Briefcase, Plus, Users, User, Star, Flame } from 'lucide-react';
 import VisitorTracker from '@/components/VisitorTracker';
 
 /* ─── Hero Section ─── */
-function HeroSection({ t, locale }) {
+function HeroSection({ t, locale, heroBikeImage }) {
   return (
     <section className="relative pt-28 pb-32 lg:pt-40 lg:pb-48 overflow-hidden bg-white">
       {/* Decorative Blob */}
@@ -43,12 +44,13 @@ function HeroSection({ t, locale }) {
 
             {/* The main featured bike */}
             <Image 
-              src={bikes[0].image} 
+              src={heroBikeImage || '/images/bikes/roadbike.png'} 
               alt="Premium Bike" 
               fill 
               className="object-contain filter drop-shadow-2xl z-10"
               sizes="(max-width: 768px) 100vw, 50vw"
               priority
+              unoptimized
             />
 
             {/* Mascot floating over the bike */}
@@ -236,7 +238,14 @@ function HowItWorks({ t }) {
 /* ─── Featured Bikes (Clean Cards) ─── */
 function FeaturedBikes({ t }) {
   const router = useRouter();
-  const featured = bikes.slice(0, 3);
+  const [featured, setFeatured] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/bikes')
+      .then(r => r.json())
+      .then(data => setFeatured(data.slice(0, 3)))
+      .catch(() => {});
+  }, []);
 
   const handleBikeBook = (bike) => {
     const isLoggedIn = typeof window !== 'undefined' && localStorage.getItem('isMember');
@@ -526,10 +535,18 @@ function PartnersSection({ t, locale }) {
 /* ─── Main Landing Page ─── */
 export default function LandingPage() {
   const { t, locale } = useI18n();
+  const [heroBikeImage, setHeroBikeImage] = useState('/images/bikes/roadbike.png');
+
+  useEffect(() => {
+    fetch('/api/bikes')
+      .then(r => r.json())
+      .then(data => { if (data?.[0]?.image) setHeroBikeImage(data[0].image); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-screen">
-      <HeroSection t={t} locale={locale} />
+      <HeroSection t={t} locale={locale} heroBikeImage={heroBikeImage} />
       <AboutSection t={t} />
       <HowItWorks t={t} />
       <RentalOptions t={t} locale={locale} />
