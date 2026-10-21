@@ -184,7 +184,14 @@ export default function AdminFleetPage() {
         {filteredFleet.map(bike => (
           <div key={bike.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col transition-all hover:shadow-md hover:-translate-y-1">
             <div className="relative aspect-video bg-gray-50 border-b border-gray-100 p-4">
-              <Image src={bike.image} alt={bike.name} fill className="object-contain p-2" unoptimized={bike.image?.startsWith('data:')} />
+              <Image 
+                src={bike.image} 
+                alt={bike.name} 
+                fill 
+                className="object-contain p-2" 
+                unoptimized
+                onError={(e) => { e.target.src = '/images/bikes/roadbike.png'; }}
+              />
               <div className="absolute top-3 left-3 flex gap-2">
                 {bike.popular && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm bg-amber-50 text-amber-600 border border-amber-200">

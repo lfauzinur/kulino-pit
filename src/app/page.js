@@ -265,6 +265,7 @@ function FeaturedBikes({ t }) {
                   fill 
                   className="object-contain p-4 transition-transform duration-500 group-hover:scale-110"
                   sizes="(max-width: 768px) 100vw, 33vw"
+                  unoptimized
                 />
                 {bike.popular && (
                   <span className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-600 text-[9px] font-bold border border-amber-200 z-10">

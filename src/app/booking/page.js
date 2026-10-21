@@ -57,7 +57,7 @@ function Step1({ bikesList, selected, onSelect, locale, t }) {
                 </span>
               )}
               <div className="relative w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 shrink-0 overflow-hidden flex items-center justify-center">
-                <Image src={bike.image} alt={bike.name} fill className="object-contain p-2 drop-shadow-md" />
+                <Image src={bike.image} alt={bike.name} fill className="object-contain p-2 drop-shadow-md" unoptimized />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-display font-black text-lg text-gray-900">{bike.name}</p>
@@ -305,7 +305,7 @@ function Step4({ selectedBike, rentalType, dates, pickupMethod, selectedAccessor
             {selectedBike && (
               <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
                 <div className="relative w-20 h-20 rounded-2xl bg-white border border-gray-100 overflow-hidden shrink-0 shadow-sm">
-                  <Image src={selectedBike.image} alt={selectedBike.name} fill className="object-contain p-2" />
+                  <Image src={selectedBike.image} alt={selectedBike.name} fill className="object-contain p-2" unoptimized />
                 </div>
                 <div>
                   <p className="font-display font-black text-base text-gray-900">{selectedBike.name}</p>

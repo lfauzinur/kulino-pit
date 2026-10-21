@@ -53,7 +53,7 @@ export default function UnitSepedaPage() {
             return (
               <article key={bike.id} className="brutal-card overflow-hidden">
                 <div className="relative aspect-square bg-[var(--color-cream-dark)] border-b-3 border-black overflow-hidden group">
-                  <Image src={bike.image} alt={bike.name} fill className="object-contain p-6 transition-transform duration-300 group-hover:scale-110" />
+                  <Image src={bike.image} alt={bike.name} fill className="object-contain p-6 transition-transform duration-300 group-hover:scale-110" unoptimized />
                   <div className="absolute top-3 left-3 flex flex-col gap-1.5">
                     <span className="brutal-badge bg-[var(--color-orange)] text-white text-[8px]">
                       {t(`bikes.categories.${bike.category}`)}
