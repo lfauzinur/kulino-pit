@@ -173,6 +173,7 @@ function AboutSection({ t }) {
 
 /* ─── How It Works Section ─── */
 function HowItWorks({ t }) {
+  const router = useRouter();
   const steps = [
     { num: '01', title: t('howItWorks.step1Title'), desc: t('howItWorks.step1Desc') },
     { num: '02', title: t('howItWorks.step2Title'), desc: t('howItWorks.step2Desc') },
@@ -225,7 +226,7 @@ function HowItWorks({ t }) {
               </div>
             </div>
             <div className="mt-8">
-              <button className="btn btn-primary w-full py-3">Search Route</button>
+              <button onClick={() => router.push('/routes')} className="btn btn-primary w-full py-3">Search Route</button>
             </div>
           </div>
 
@@ -365,7 +366,10 @@ function RentalOptions({ t, locale }) {
               <div className="p-8 flex-1 flex flex-col text-center">
                 <h3 className="font-display font-black text-xl text-gray-900 mb-3">{opt.title}</h3>
                 <p className="text-sm text-gray-500 mb-8 flex-1">{opt.desc}</p>
-                <Link href="/booking" className="btn btn-primary w-full py-3 flex items-center justify-center gap-2">
+                <Link
+                  href={opt.id === 'reguler' ? '/booking' : opt.id === 'family' ? '/booking/family' : '/booking/corporate'}
+                  className="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
+                >
                   {t('rentalOptions.rentNow')}
                 </Link>
               </div>

@@ -132,6 +132,7 @@ function Step2({ selectedBike, rentalType, setRentalType, dates, setDates, picku
               <input
                 type="date"
                 value={dates.start}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={e => setDates(d => ({ ...d, start: e.target.value }))}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)] bg-gray-50 hover:bg-white transition-colors"
               />
@@ -141,6 +142,7 @@ function Step2({ selectedBike, rentalType, setRentalType, dates, setDates, picku
               <input
                 type="date"
                 value={dates.end}
+                min={dates.start || new Date().toISOString().split('T')[0]}
                 onChange={e => setDates(d => ({ ...d, end: e.target.value }))}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)] bg-gray-50 hover:bg-white transition-colors"
               />
@@ -164,6 +166,7 @@ function Step2({ selectedBike, rentalType, setRentalType, dates, setDates, picku
           <input
             type="date"
             value={dates.start}
+            min={new Date().toISOString().split('T')[0]}
             onChange={e => setDates(d => ({ ...d, start: e.target.value, end: e.target.value }))}
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)] bg-gray-50 hover:bg-white transition-colors max-w-xs"
           />
@@ -195,10 +198,25 @@ function Step2({ selectedBike, rentalType, setRentalType, dates, setDates, picku
 }
 
 /* Step 3: Accessories */
-function Step3({ selectedAccessories, toggleAccessory, locale, t }) {
+function Step3({ selectedAccessories, toggleAccessory, setSelectedAccessories, locale, t }) {
+  const allSelected = selectedAccessories.length === accessories.length;
   return (
     <div className="animate-fade-in">
-      <h2 className="font-display font-black text-2xl mb-6 text-gray-900">Pilih Aksesoris Tambahan</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="font-display font-black text-2xl text-gray-900">Pilih Aksesoris Tambahan</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSelectedAccessories(allSelected ? [] : accessories.map(a => a.id))}
+            className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+              allSelected
+                ? 'border-red-200 text-red-600 bg-red-50 hover:bg-red-100'
+                : 'border-[var(--color-primary)] text-[var(--color-primary)] bg-blue-50 hover:bg-blue-100'
+            }`}
+          >
+            {allSelected ? '✕ Kosongkan Semua' : '✓ Pilih Semua'}
+          </button>
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {accessories.map(acc => {
           const isSelected = selectedAccessories.includes(acc.id);
@@ -518,7 +536,7 @@ export default function BookingPage() {
         <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-100 relative">
           {step === 0 && <Step1 bikesList={bikesList} selected={selectedBike} onSelect={setSelectedBike} locale={locale} t={t} />}
           {step === 1 && <Step2 selectedBike={selectedBike} rentalType={rentalType} setRentalType={setRentalType} dates={dates} setDates={setDates} pickupMethod={pickupMethod} setPickupMethod={setPickupMethod} t={t} locale={locale} />}
-          {step === 2 && <Step3 selectedAccessories={selectedAccessories} toggleAccessory={toggleAccessory} locale={locale} t={t} />}
+          {step === 2 && <Step3 selectedAccessories={selectedAccessories} toggleAccessory={toggleAccessory} setSelectedAccessories={setSelectedAccessories} locale={locale} t={t} />}
           {step === 3 && <Step4 selectedBike={selectedBike} rentalType={rentalType} dates={dates} pickupMethod={pickupMethod} selectedAccessories={selectedAccessories} customerInfo={customerInfo} setCustomerInfo={setCustomerInfo} t={t} locale={locale} />}
 
           {/* Navigation */}
