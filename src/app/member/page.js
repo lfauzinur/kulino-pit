@@ -1834,15 +1834,26 @@ function SpinWheelAndPointsTab({ t, locale }) {
   const [result, setResult] = useState(null);
   const [rotation, setRotation] = useState(0);
   const [spinHistory, setSpinHistory] = useState([]);
-  const userPoints = memberData.points;
+  const [currentPoints, setCurrentPoints] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return parseInt(localStorage.getItem('memberPoints') || String(memberData.points));
+    }
+    return memberData.points;
+  });
+
+  // Prize claim modal
+  const [claimModal, setClaimModal] = useState(null); // { type: 'spin'|'exchange', prize, code }
+  
+  // Exchange confirm modal
+  const [exchangeModal, setExchangeModal] = useState(null); // reward object
 
   const defaultPrizes = [
-    { label: 'Diskon 10%', color: '#0284C7', chance: 25 },    // Kulino Sky Blue
-    { label: 'Gratis Helm', color: '#0D9488', chance: 15 },   // Ocean Teal
-    { label: 'Voucher 50K', color: '#D97706', chance: 20 },   // Warm Amber
-    { label: 'Coba Lagi', color: '#475569', chance: 25 },     // Slate Cool Neutral
-    { label: 'Gratis 1 Jam', color: '#2563EB', chance: 10 },  // Primary Deep Blue
-    { label: 'Jersey Kulino', color: '#059669', chance: 5 },  // Forest Emerald
+    { label: 'Diskon 10%', color: '#0284C7', chance: 25 },
+    { label: 'Gratis Helm', color: '#0D9488', chance: 15 },
+    { label: 'Voucher 50K', color: '#D97706', chance: 20 },
+    { label: 'Coba Lagi', color: '#475569', chance: 25 },
+    { label: 'Gratis 1 Jam', color: '#2563EB', chance: 10 },
+    { label: 'Jersey Kulino', color: '#059669', chance: 5 },
   ];
 
   const [prizes, setPrizes] = useState(defaultPrizes);
@@ -1853,25 +1864,8 @@ function SpinWheelAndPointsTab({ t, locale }) {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length >= 2) {
-          setTimeout(() => {
-            setPrizes(parsed);
-          }, 0);
+          setTimeout(() => setPrizes(parsed), 0);
           return;
-        }
-      } catch (e) { /* ignore */ }
-    }
-    const legacyStored = localStorage.getItem('spinPrizes');
-    if (legacyStored) {
-      try {
-        const parsed = JSON.parse(legacyStored);
-        if (Array.isArray(parsed) && parsed.length >= 2) {
-          const hasLegacyColors = parsed.some(p => p.color === '#EF4444' || p.color === '#EC4899' || p.color === '#8B5CF6');
-          if (!hasLegacyColors) {
-            setTimeout(() => {
-              setPrizes(parsed);
-            }, 0);
-            return;
-          }
         }
       } catch (e) { /* ignore */ }
     }
@@ -1917,14 +1911,14 @@ function SpinWheelAndPointsTab({ t, locale }) {
 
     ctx.restore();
 
-    // Elegant Outer Rim Border
+    // Outer rim
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Center pin with metallic/slate ring
+    // Center pin
     ctx.beginPath();
     ctx.arc(cx, cy, 26, 0, 2 * Math.PI);
     ctx.fillStyle = '#0F172A';
@@ -1933,20 +1927,18 @@ function SpinWheelAndPointsTab({ t, locale }) {
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
-    // Inner center circle
     ctx.beginPath();
     ctx.arc(cx, cy, 20, 0, 2 * Math.PI);
     ctx.fillStyle = '#0284C7';
     ctx.fill();
 
-    // Center 'SPIN' text
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 10px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('SPIN', cx, cy);
 
-    // Arrow pointer at top with sleek styling
+    // Arrow pointer at top
     ctx.beginPath();
     ctx.moveTo(cx - 11, 7);
     ctx.lineTo(cx + 11, 7);
@@ -1971,10 +1963,11 @@ function SpinWheelAndPointsTab({ t, locale }) {
   }, [rotation, drawWheel]);
 
   const handleSpin = () => {
-    if (isSpinning || userPoints < SPIN_COST) return;
+    if (isSpinning || currentPoints < SPIN_COST) return;
     setIsSpinning(true);
     setResult(null);
 
+    // Pick winner by chance
     const totalChance = prizes.reduce((sum, p) => sum + p.chance, 0);
     let rand = Math.random() * totalChance;
     let winIndex = 0;
@@ -1983,24 +1976,38 @@ function SpinWheelAndPointsTab({ t, locale }) {
       if (rand <= 0) { winIndex = i; break; }
     }
 
-    const sliceAngle = 360 / prizes.length;
-    const targetSlice = 360 - (winIndex * sliceAngle + sliceAngle / 2);
-    const spins = 5 + Math.floor(Math.random() * 3);
-    const targetRotation = rotation + spins * 360 + targetSlice - (rotation % 360);
+    // FIX: Always land exactly at CENTER of winning segment (not on border)
+    // The pointer is at top (270°). Wheel rotates clockwise. Segment i starts at i*sliceDeg.
+    // To land segment winIndex under top pointer, we need to rotate so that
+    // the CENTER of that segment is at 270° (= -90°).
+    const sliceDeg = 360 / prizes.length;
+    // Center of winning segment in wheel coords
+    const segmentCenter = winIndex * sliceDeg + sliceDeg / 2;
+    // We need: (rotation + segmentCenter) mod 360 == 270 (pointer at top = -90 = 270)
+    // Additional small random jitter within ±30% of half-slice so it clearly lands IN the segment
+    const maxJitter = (sliceDeg * 0.28);
+    const jitter = (Math.random() * 2 - 1) * maxJitter;
+    // How much the wheel needs to be at
+    const neededBase = (270 - segmentCenter - jitter + 3600) % 360;
+    // Add multiple full rotations so it spins 5-8 times
+    const extraSpins = 5 + Math.floor(Math.random() * 4);
+    const currentNorm = ((rotation % 360) + 360) % 360;
+    const diff = (neededBase - currentNorm + 360) % 360;
+    const targetRotation = rotation + extraSpins * 360 + diff;
 
-    const duration = 3800;
+    const duration = 4000;
     const startTime = performance.now();
     const startRotation = rotation;
     const delta = targetRotation - startRotation;
 
-    function easeOutCubic(t) {
-      return 1 - Math.pow(1 - t, 3);
+    function easeOutQuart(t) {
+      return 1 - Math.pow(1 - t, 4);
     }
 
     function animate(now) {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const easedProgress = easeOutCubic(progress);
+      const easedProgress = easeOutQuart(progress);
       const currentRot = startRotation + delta * easedProgress;
       setRotation(currentRot);
 
@@ -2009,30 +2016,61 @@ function SpinWheelAndPointsTab({ t, locale }) {
       } else {
         setRotation(targetRotation);
         setIsSpinning(false);
-        setResult(prizes[winIndex]);
+        const won = prizes[winIndex];
+        setResult(won);
+
+        // Deduct spin cost and save
+        const newPoints = currentPoints - SPIN_COST;
+        setCurrentPoints(newPoints);
+        localStorage.setItem('memberPoints', String(newPoints));
+
+        // Save spin history
         setSpinHistory(prev => [
-          { prize: prizes[winIndex].label, time: new Date().toLocaleTimeString() },
+          { prize: won.label, time: new Date().toLocaleTimeString() },
           ...prev.slice(0, 4),
         ]);
+
+        // Show claim modal (not for "Coba Lagi")
+        if (won.label !== 'Coba Lagi') {
+          const claimCode = `KP-SPIN-${Date.now().toString(36).toUpperCase()}`;
+          setTimeout(() => {
+            setClaimModal({ type: 'spin', prize: won.label, code: claimCode });
+          }, 600);
+        }
       }
     }
     requestAnimationFrame(animate);
   };
 
+  const handleExchange = (reward) => {
+    if (currentPoints < reward.cost) return;
+    setExchangeModal(reward);
+  };
+
+  const confirmExchange = () => {
+    if (!exchangeModal) return;
+    const newPoints = currentPoints - exchangeModal.cost;
+    setCurrentPoints(newPoints);
+    localStorage.setItem('memberPoints', String(newPoints));
+    const claimCode = `KP-XCH-${Date.now().toString(36).toUpperCase()}`;
+    setClaimModal({ type: 'exchange', prize: exchangeModal.name[locale] || exchangeModal.name.id, code: claimCode });
+    setExchangeModal(null);
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="rounded-[28px] p-6 bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white shadow-lg border border-sky-500/20 flex items-center justify-between flex-wrap gap-4">
+      {/* Header — lighter gradient so text is clearly visible */}
+      <div className="rounded-[28px] p-5 bg-gradient-to-r from-sky-700 via-sky-600 to-blue-700 text-white shadow-lg border border-sky-400/30 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="font-display font-black text-xl flex items-center gap-2">
-            <RotateCcw size={22} className="text-sky-400" /> Spin & Win Lucky Wheel
+            <RotateCcw size={22} className="text-white" /> Spin &amp; Win Lucky Wheel
           </h2>
-          <p className="text-xs text-slate-300 mt-1">
-            Biaya 100 poin per putaran • Saldo Anda: {userPoints.toLocaleString()} pts
+          <p className="text-xs text-white/90 mt-1">
+            Biaya 100 poin per putaran • Saldo Anda: {currentPoints.toLocaleString()} pts
           </p>
         </div>
-        <div className="px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-bold flex items-center gap-1.5 backdrop-blur-sm">
-          <Trophy size={14} className="text-amber-400" /> {userPoints.toLocaleString()} pts
+        <div className="px-3.5 py-1.5 rounded-full bg-white/20 border border-white/30 text-xs font-bold flex items-center gap-1.5">
+          <Trophy size={14} className="text-amber-300" /> {currentPoints.toLocaleString()} pts
         </div>
       </div>
 
@@ -2043,11 +2081,11 @@ function SpinWheelAndPointsTab({ t, locale }) {
             <canvas ref={canvasRef} style={{ width: 300, height: 300 }} />
             <button
               onClick={handleSpin}
-              disabled={isSpinning || userPoints < SPIN_COST}
+              disabled={isSpinning || currentPoints < SPIN_COST}
               className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full font-black text-xs z-10 transition-all flex items-center justify-center border-2 border-white shadow-xl ${
                 isSpinning
                   ? 'bg-slate-700 text-slate-400 cursor-wait'
-                  : userPoints < SPIN_COST
+                  : currentPoints < SPIN_COST
                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                     : 'bg-gradient-to-br from-sky-500 to-sky-600 text-white hover:scale-110 cursor-pointer shadow-sky-500/30'
               }`}
@@ -2058,25 +2096,46 @@ function SpinWheelAndPointsTab({ t, locale }) {
 
           <button
             onClick={handleSpin}
-            disabled={isSpinning || userPoints < SPIN_COST}
+            disabled={isSpinning || currentPoints < SPIN_COST}
             className={`btn w-full py-3.5 font-display font-black text-sm tracking-wider flex items-center justify-center gap-2 cursor-pointer ${
               isSpinning 
                 ? 'bg-gray-300 text-gray-500 cursor-wait' 
-                : userPoints < SPIN_COST 
+                : currentPoints < SPIN_COST 
                   ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
                   : 'btn-primary shadow-md'
             }`}
           >
             <RotateCcw size={16} className={isSpinning ? 'animate-spin' : ''} />
-            {isSpinning ? 'Sedang Memutar...' : 'Putar Sekarang (100 Pts)'}
+            {isSpinning ? 'Sedang Memutar...' : `Putar Sekarang (${SPIN_COST} Pts)`}
           </button>
 
           {result && (
-            <div className="mt-5 w-full p-5 rounded-2xl bg-amber-50 border border-amber-200 text-center animate-fade-in">
-              <Gift className="mx-auto text-amber-500 mb-2" size={32} />
-              <p className="text-xs text-gray-500 font-bold">Selamat! Anda Memenangkan:</p>
+            <div className={`mt-5 w-full p-5 rounded-2xl border text-center animate-fade-in ${
+              result.label === 'Coba Lagi' ? 'bg-gray-50 border-gray-200' : 'bg-amber-50 border-amber-200'
+            }`}>
+              <Gift className={`mx-auto mb-2 ${result.label === 'Coba Lagi' ? 'text-gray-400' : 'text-amber-500'}`} size={32} />
+              <p className="text-xs text-gray-500 font-bold">
+                {result.label === 'Coba Lagi' ? 'Sayang sekali...' : 'Selamat! Anda Memenangkan:'}
+              </p>
               <p className="font-display font-black text-2xl text-gray-900 mt-1">{result.label}</p>
-              <p className="text-[10px] text-gray-500 mt-1">Tunjukkan ke admin saat checkout untuk klaim reward.</p>
+              {result.label !== 'Coba Lagi' && (
+                <p className="text-[10px] text-amber-700 mt-2 font-semibold">
+                  🎉 Kode klaim sudah tersimpan. Tunjukkan ke admin saat checkout.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Spin history */}
+          {spinHistory.length > 0 && (
+            <div className="mt-4 w-full">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Riwayat Spin</p>
+              {spinHistory.map((s, i) => (
+                <div key={i} className="flex justify-between text-[11px] py-1 border-b border-gray-50">
+                  <span className="font-semibold text-gray-700">{s.prize}</span>
+                  <span className="text-gray-400">{s.time}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -2098,10 +2157,11 @@ function SpinWheelAndPointsTab({ t, locale }) {
                     </div>
                   </div>
                   <button
-                    disabled={userPoints < reward.cost}
-                    className={`btn px-3.5 py-1.5 text-[11px] font-bold rounded-xl cursor-pointer transition-all ${
-                      userPoints >= reward.cost 
-                        ? 'btn-primary shadow-sm hover:shadow' 
+                    onClick={() => handleExchange(reward)}
+                    disabled={currentPoints < reward.cost}
+                    className={`btn px-3.5 py-1.5 text-[11px] font-bold rounded-xl transition-all ${
+                      currentPoints >= reward.cost 
+                        ? 'btn-primary shadow-sm hover:shadow cursor-pointer' 
                         : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                     }`}
                   >
@@ -2111,11 +2171,100 @@ function SpinWheelAndPointsTab({ t, locale }) {
               ))}
             </div>
           </div>
+
+          {/* Current points display */}
+          <div className="bg-gradient-to-br from-sky-50 to-blue-50 rounded-2xl p-4 border border-sky-100 text-center">
+            <p className="text-[10px] font-bold text-sky-700 uppercase tracking-wider mb-1">Saldo Poin Anda</p>
+            <p className="font-display font-black text-3xl text-sky-700">{currentPoints.toLocaleString()}</p>
+            <p className="text-[10px] text-sky-500 mt-0.5">pts</p>
+          </div>
         </div>
       </div>
+
+      {/* === EXCHANGE CONFIRM MODAL === */}
+      {exchangeModal && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setExchangeModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-4">
+              <Gift size={28} />
+            </div>
+            <h3 className="font-display font-black text-lg text-gray-900 mb-1">Konfirmasi Penukaran</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              <strong>{exchangeModal.name[locale] || exchangeModal.name.id}</strong>
+            </p>
+            <p className="text-xs text-gray-500 mb-4">
+              Akan dikurangi <strong className="text-red-500">{exchangeModal.cost.toLocaleString()} poin</strong> dari saldo Anda.<br/>
+              Sisa: <strong>{(currentPoints - exchangeModal.cost).toLocaleString()} pts</strong>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setExchangeModal(null)}
+                className="btn flex-1 bg-gray-100 text-gray-700 py-2.5 text-sm font-bold hover:bg-gray-200 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmExchange}
+                className="btn btn-primary flex-1 py-2.5 text-sm font-bold cursor-pointer"
+              >
+                Ya, Tukar!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === PRIZE / CLAIM SUCCESS MODAL === */}
+      {claimModal && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setClaimModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle size={36} />
+            </div>
+            <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider border border-emerald-200">
+              {claimModal.type === 'spin' ? 'Hadiah Spin!' : 'Penukaran Berhasil!'}
+            </span>
+            <h3 className="font-display font-black text-xl text-gray-900 mt-3 mb-1">{claimModal.prize}</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              {claimModal.type === 'spin'
+                ? 'Selamat! Tunjukkan kode di bawah kepada admin saat checkout untuk klaim hadiah.'
+                : 'Penukaran berhasil! Tunjukkan kode ini ke admin untuk mendapatkan reward Anda.'}
+            </p>
+
+            {/* Claim code box */}
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-4">
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Kode Klaim</p>
+              <p className="font-mono font-black text-lg text-gray-900 tracking-widest">{claimModal.code}</p>
+            </div>
+
+            <p className="text-[10px] text-gray-400 mb-4">
+              Berlaku 30 hari • Tidak dapat digabungkan dengan promo lain
+            </p>
+            <button
+              onClick={() => setClaimModal(null)}
+              className="btn btn-primary w-full py-3 text-sm font-bold cursor-pointer"
+            >
+              Mengerti, Simpan Kode
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 /* ─── Referral Tab ─── */
 function ReferralTab({ t, locale }) {
