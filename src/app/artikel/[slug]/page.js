@@ -1,33 +1,28 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Calendar, User, Share2, Link2, MessageCircle } from 'lucide-react';
 import { articles } from '@/lib/data';
 import { useI18n } from '@/lib/i18n';
 
-export default function ArticleDetail({ params }) {
+export default function ArticleDetail() {
   const { locale } = useI18n();
+  const { slug } = useParams();
   const [allArticles, setAllArticles] = useState(articles);
   const [article, setArticle] = useState(null);
 
   useEffect(() => {
-    try {
-      const custom = JSON.parse(localStorage.getItem('customArticles') || '[]');
-      const merged = [...custom, ...articles];
-      setAllArticles(merged);
-      
-      const found = merged.find(a => a.id.toString() === params.slug);
-      if (found) {
-        setArticle(found);
-      } else {
-        setArticle(merged[0]);
-      }
-    } catch(e) {
-      console.error(e);
-      setArticle(articles[0]);
-    }
-  }, [params.slug]);
+    fetch('/api/articles', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : [])
+      .then((custom) => {
+        const merged = [...custom, ...articles];
+        setAllArticles(merged);
+        setArticle(merged.find((item) => String(item.id) === String(slug)) || merged[0]);
+      })
+      .catch(() => setArticle(articles.find((item) => String(item.id) === String(slug)) || articles[0]));
+  }, [slug]);
 
   if (!article) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
@@ -81,6 +76,17 @@ export default function ArticleDetail({ params }) {
           
           {/* Main Content */}
           <div className="md:col-span-8 prose prose-lg max-w-none text-gray-700 leading-loose">
+            {article.content?.length > 0 ? article.content.map((block) => block.type === 'text' ? (
+              <section key={block.id} className="mb-8">
+                {block.title && <h3 className="font-display font-black text-2xl text-gray-900 mb-4">{block.title}</h3>}
+                <p className="whitespace-pre-wrap">{block.content}</p>
+              </section>
+            ) : block.url ? (
+              <figure key={block.id} className="my-8">
+                <img src={block.url} alt={block.caption || article.title[locale] || article.title.id} className="w-full rounded-2xl" />
+                {block.caption && <figcaption className="mt-2 text-center text-sm text-gray-500">{block.caption}</figcaption>}
+              </figure>
+            ) : null) : <>
             <p className="first-letter:text-7xl first-letter:font-black first-letter:text-[var(--color-primary)] first-letter:mr-3 first-letter:float-left">
               {locale === 'id' 
                 ? 'Banyuwangi selalu menyimpan pesona alam yang tak pernah ada habisnya untuk dieksplorasi. Bagi para pecinta olahraga bersepeda, wilayah ini adalah surga dunia yang menawarkan perpaduan sempurna antara kontur pegunungan yang menantang dan garis pantai yang eksotis.' 
@@ -91,7 +97,6 @@ export default function ArticleDetail({ params }) {
                 ? 'Dalam artikel ini, kita akan membedah secara mendalam mengapa rute-rute di Banyuwangi sangat direkomendasikan baik untuk pemula maupun pesepeda profesional. Mulai dari tanjakan legendaris Ijen hingga jalan santai melintasi hutan de Djawatan.' 
                 : 'In this article, we will deeply dissect why the routes in Banyuwangi are highly recommended for both beginners and professional cyclists. From the legendary Ijen climb to a relaxing ride through the de Djawatan forest.'}
             </p>
-
             <h3 className="font-display font-black text-2xl text-gray-900 mt-10 mb-4">
               {locale === 'id' ? 'Mempersiapkan Fisik dan Sepeda' : 'Preparing Physically and Your Bike'}
             </h3>
@@ -125,6 +130,7 @@ export default function ArticleDetail({ params }) {
                 ? 'Perjalanan bukanlah tentang seberapa cepat Anda sampai di garis akhir, melainkan tentang pengalaman di sepanjang jalan. Nikmati udaranya, sapalah warga lokal yang ramah, dan jangan lupa berhenti sejenak untuk mengabadikan momen di titik-titik pemandangan terbaik.' 
                 : 'The journey is not about how fast you reach the finish line, but the experience along the way. Enjoy the air, greet the friendly locals, and don\'t forget to pause to capture moments at the best scenic spots.'}
             </p>
+            </>}
           </div>
 
           {/* Sidebar / Share */}
@@ -153,7 +159,7 @@ export default function ArticleDetail({ params }) {
               
               <h4 className="font-bold text-gray-900 mb-4">{locale === 'id' ? 'Artikel Terkait' : 'Related Articles'}</h4>
               <div className="space-y-4">
-                {allArticles.filter(a => a.id.toString() !== params.slug).slice(0, 2).map((rel) => (
+                {allArticles.filter(a => a.id.toString() !== String(slug)).slice(0, 2).map((rel) => (
                   <Link key={rel.id} href={`/artikel/${rel.id}`} className="group flex gap-3 items-center">
                     <div className="w-20 h-20 relative rounded-xl overflow-hidden shrink-0">
                       <Image src={rel.image || '/images/bikes/roadbike.png'} alt={rel.title[locale] || rel.title['id']} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />

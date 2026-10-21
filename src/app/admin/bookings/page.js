@@ -5,40 +5,29 @@ import { CalendarDays, Search, Filter, ChevronDown, Settings, X, Save } from 'lu
 
 export default function AdminBookingsPage() {
   const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [updatingId, setUpdatingId] = useState('');
   const filters = ['All', 'Pending', 'Active', 'Completed', 'Cancelled'];
-
-  const initialBookings = [
-    { id: 'KP-827361', date: '2026-10-04', user: 'Budi Santoso', phone: '081234567890', bike: 'Polygon Helios C8', days: 2, status: 'Pending', total: 450000 },
-    { id: 'KP-827360', date: '2026-10-03', user: 'Andi Wijaya', phone: '081298765432', bike: 'Giant Defy Advanced', days: 1, status: 'Active', total: 600000 },
-    { id: 'KP-827359', date: '2026-10-01', user: 'Siti Nurhaliza', phone: '081311223344', bike: 'Brompton M6L', days: 1, status: 'Completed', total: 350000 },
-    { id: 'KP-827358', date: '2026-09-28', user: 'Reza Rahadian', phone: '085699887766', bike: 'Trek Marlin 7', days: 3, status: 'Completed', total: 600000 },
-    { id: 'KP-827357', date: '2026-09-25', user: 'Ayu Lestari', phone: '081122334455', bike: 'Specialized Tarmac', days: 1, status: 'Cancelled', total: 800000 },
-  ];
-
-  const [allBookings, setAllBookings] = useState(initialBookings);
-  const filtered = filter === 'All' ? allBookings : allBookings.filter(b => b.status === filter);
+  const [allBookings, setAllBookings] = useState([]);
+  const filtered = allBookings.filter((booking) => {
+    const matchesFilter = filter === 'All' || booking.status === filter;
+    const needle = query.trim().toLowerCase();
+    const matchesQuery = !needle || [booking.id, booking.user, booking.phone, booking.bike]
+      .some((value) => String(value || '').toLowerCase().includes(needle));
+    return matchesFilter && matchesQuery;
+  });
 
   useEffect(() => {
-    const savedBookings = JSON.parse(localStorage.getItem('memberBookings')) || [];
-    // Convert savedBookings from member format to admin format if needed, 
-    // or just merge them since admin table renders id, date, user, bike, status, total.
-    // For new bookings, we might not have user/phone, but we can default them.
-    const formattedSaved = savedBookings.map(b => ({
-      ...b,
-      user: b.user || 'Member User',
-      phone: b.phone || '-',
-      days: b.durationMinutes ? Math.ceil(b.durationMinutes / 1440) : 1, // rough estimate
-      status: b.status === 'pending' ? 'Pending' : (b.status === 'active' ? 'Active' : (b.status === 'completed' ? 'Completed' : b.status))
-    }));
-
-    // Merge without duplicates by ID
-    const merged = [...formattedSaved];
-    initialBookings.forEach(ib => {
-      if (!merged.find(m => m.id === ib.id)) {
-        merged.push(ib);
-      }
-    });
-    setAllBookings(merged);
+    fetch('/api/bookings', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Gagal memuat booking.');
+        setAllBookings(data);
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false));
   }, []);
 
   // Payment Settings Modal
@@ -51,7 +40,7 @@ export default function AdminBookingsPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem('paymentSettings');
-    if (saved) setPaymentSettings(JSON.parse(saved));
+    if (saved) Promise.resolve().then(() => setPaymentSettings(JSON.parse(saved)));
   }, []);
 
   const handleSavePaymentSettings = () => {
@@ -71,33 +60,23 @@ export default function AdminBookingsPage() {
     }
   };
 
-  const handleUpdateStatus = (id, newStatus) => {
-    const updatedBookings = allBookings.map(b => {
-      if (b.id === id) {
-        const updated = { ...b, status: newStatus };
-        if (newStatus === 'Active' && !updated.activeSince) {
-          updated.activeSince = Date.now();
-        }
-        return updated;
-      }
-      return b;
-    });
-    
-    setAllBookings(updatedBookings);
-    
-    // Also update memberBookings in localStorage
-    const savedBookings = JSON.parse(localStorage.getItem('memberBookings')) || [];
-    const newSaved = savedBookings.map(b => {
-      if (b.id === id) {
-        const updated = { ...b, status: newStatus.toLowerCase() };
-        if (newStatus === 'Active' && !updated.activeSince) {
-          updated.activeSince = Date.now();
-        }
-        return updated;
-      }
-      return b;
-    });
-    localStorage.setItem('memberBookings', JSON.stringify(newSaved));
+  const handleUpdateStatus = async (id, newStatus) => {
+    setUpdatingId(id);
+    setError('');
+    try {
+      const response = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const updated = await response.json();
+      if (!response.ok) throw new Error(updated.error || 'Status gagal diperbarui.');
+      setAllBookings((current) => current.map((booking) => booking.id === id ? updated : booking));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setUpdatingId('');
+    }
   };
 
   const statusColor = (status) => {
@@ -128,12 +107,16 @@ export default function AdminBookingsPage() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
               type="text" 
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="Search bookings..." 
               className="pl-9 pr-4 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all w-48"
             />
           </div>
         </div>
       </header>
+
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
       {/* Payment Settings Modal */}
       {showPaymentSettings && (
@@ -271,12 +254,12 @@ export default function AdminBookingsPage() {
                     <div className="flex items-center justify-end gap-2">
                       {b.status === 'Pending' && (
                         <>
-                          <button onClick={() => handleUpdateStatus(b.id, 'Active')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all">Approve</button>
-                          <button onClick={() => handleUpdateStatus(b.id, 'Cancelled')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">Reject</button>
+                          <button disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Active')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all disabled:opacity-50">Approve</button>
+                          <button disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Cancelled')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">Reject</button>
                         </>
                       )}
                       {b.status === 'Active' && (
-                        <button onClick={() => handleUpdateStatus(b.id, 'Completed')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all">Complete</button>
+                        <button disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Completed')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all disabled:opacity-50">Complete</button>
                       )}
                       <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="View Details">
                         👁️
@@ -288,12 +271,13 @@ export default function AdminBookingsPage() {
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-12">
             <CalendarDays size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 font-medium">No bookings found for this filter.</p>
           </div>
         )}
+        {loading && <div className="py-12 text-center text-sm text-gray-500">Memuat booking dari database…</div>}
       </div>
     </div>
   );

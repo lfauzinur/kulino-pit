@@ -19,9 +19,30 @@ const benefitIcons = [
 export default function JadiMitraPage() {
   const { t, locale } = useI18n();
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', whatsapp: '', location: '', bikeBrand: '', bikeType: '', bikeSize: '', condition: 'Baik' });
 
   const benefits = t('partner.benefits');
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      const response = await fetch('/api/partners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Pendaftaran gagal dikirim.');
+      setSubmitted(true);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (submitted) {
     return (
@@ -133,8 +154,9 @@ export default function JadiMitraPage() {
                   <span className="text-xs text-gray-500">{t('partner.clickUpload')}</span>
                 </div>
               </div>
-              <button onClick={() => setSubmitted(true)} className="btn btn-primary w-full py-4 text-sm mt-4 flex items-center justify-center gap-2">
-                {t('partner.submit')} <ArrowRight size={16} />
+              {error && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
+              <button disabled={submitting} onClick={handleSubmit} className="btn btn-primary w-full py-4 text-sm mt-4 flex items-center justify-center gap-2 disabled:opacity-50">
+                {submitting ? 'Mengirim…' : t('partner.submit')} <ArrowRight size={16} />
               </button>
             </div>
           </div>

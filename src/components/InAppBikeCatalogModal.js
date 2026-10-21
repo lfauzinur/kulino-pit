@@ -1,9 +1,26 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { X, Bike, Flame, ArrowRight } from 'lucide-react';
-import { bikes, formatCurrency, getLowestPrice } from '@/lib/data';
+import { formatCurrency, getLowestPrice } from '@/lib/data';
 
 export default function InAppBikeCatalogModal({ isOpen, onClose, onSelectBike }) {
+  const [bikes, setBikes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch('/api/bikes', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Gagal memuat armada.');
+        setBikes(data.filter((bike) => bike.available));
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false));
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -33,6 +50,9 @@ export default function InAppBikeCatalogModal({ isOpen, onClose, onSelectBike })
 
         {/* Bike List */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-3 scrollbar-hide flex-1">
+          {loading && <p className="py-12 text-center text-sm text-gray-500">Memuat armada dari database…</p>}
+          {error && <p className="py-12 text-center text-sm font-semibold text-red-600">{error}</p>}
+          {!loading && !error && bikes.length === 0 && <p className="py-12 text-center text-sm text-gray-500">Belum ada unit yang tersedia.</p>}
           {bikes.map((bike) => {
             const minPrice = getLowestPrice(bike);
             return (

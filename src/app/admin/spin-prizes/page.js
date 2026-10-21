@@ -19,35 +19,50 @@ const COLOR_PRESETS = [
 export default function AdminSpinPrizesPage() {
   const [prizes, setPrizes] = useState(DEFAULT_PRIZES);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const stored = localStorage.getItem('spinPrizes_v2') || localStorage.getItem('spinPrizes');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length >= 2) {
-          const hasLegacyColors = parsed.some(p => p.color === '#EF4444' || p.color === '#EC4899' || p.color === '#8B5CF6');
-          if (!hasLegacyColors) {
-            setPrizes(parsed);
-          }
-        }
-      } catch (e) { /* use defaults */ }
-    }
+    fetch('/api/spin-prizes', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Gagal memuat hadiah.');
+        setPrizes(data);
+      })
+      .catch((requestError) => setError(requestError.message));
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem('spinPrizes_v2', JSON.stringify(prizes));
-    localStorage.setItem('spinPrizes', JSON.stringify(prizes));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const savePrizes = async (nextPrizes) => {
+    const total = nextPrizes.reduce((sum, prize) => sum + Number(prize.chance), 0);
+    if (total !== 100) {
+      setError(`Total probabilitas wajib tepat 100% (saat ini ${total}%).`);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const response = await fetch('/api/spin-prizes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextPrizes),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Gagal menyimpan hadiah.');
+      setPrizes(data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const handleSave = () => savePrizes(prizes);
 
   const handleReset = () => {
     setPrizes(DEFAULT_PRIZES);
-    localStorage.setItem('spinPrizes_v2', JSON.stringify(DEFAULT_PRIZES));
-    localStorage.setItem('spinPrizes', JSON.stringify(DEFAULT_PRIZES));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    savePrizes(DEFAULT_PRIZES);
   };
 
   const addPrize = () => {
@@ -82,9 +97,10 @@ export default function AdminSpinPrizesPage() {
           </button>
           <button 
             onClick={handleSave} 
-            className={`btn px-6 py-2 text-sm font-semibold flex items-center gap-2 ${saved ? 'bg-green-500 text-white' : 'btn-primary'}`}
+            disabled={saving || totalChance !== 100}
+            className={`btn px-6 py-2 text-sm font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${saved ? 'bg-green-500 text-white' : 'btn-primary'}`}
           >
-            <Save size={14} /> {saved ? 'Tersimpan ✓' : 'Simpan'}
+            <Save size={14} /> {saving ? 'Menyimpan…' : saved ? 'Tersimpan ✓' : 'Simpan'}
           </button>
         </div>
       </header>
@@ -124,6 +140,9 @@ export default function AdminSpinPrizesPage() {
         <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold">
           ⚠️ Total probabilitas harus 100%. Saat ini: {totalChance}%. Sesuaikan nilai persentase di bawah.
         </div>
+      )}
+      {error && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm font-semibold">{error}</div>
       )}
 
       {/* Prize List Editor */}

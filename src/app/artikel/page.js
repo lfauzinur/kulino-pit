@@ -11,14 +11,10 @@ export default function ArtikelPage() {
   const [allArticles, setAllArticles] = useState(articles);
 
   useEffect(() => {
-    try {
-      const custom = JSON.parse(localStorage.getItem('customArticles') || '[]');
-      if (custom.length > 0) {
-        setAllArticles([...custom, ...articles]);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    fetch('/api/articles', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Failed to load articles')))
+      .then((custom) => setAllArticles([...custom, ...articles]))
+      .catch(console.error);
   }, []);
 
   return (

@@ -1,337 +1,208 @@
 'use client';
-import { useState } from 'react';
-import { 
-  ChevronDown, Eye, Type, Image as ImageIcon, 
-  Bold, Italic, List, Grid, Link as LinkIcon, Code,
-  Trash2, ArrowDown, ArrowUp, Move, Plus, Calendar, Clock,
-  Check, X
+import { useMemo, useRef, useState } from 'react';
+import {
+  Eye, Type, Image as ImageIcon, Bold, Italic, List, Grid, Link as LinkIcon,
+  Code, Trash2, ArrowDown, ArrowUp, Plus, Save, X,
 } from 'lucide-react';
 
+const newTextBlock = () => ({ id: crypto.randomUUID(), type: 'text', title: '', content: '' });
+const newImageBlock = () => ({ id: crypto.randomUUID(), type: 'image', url: '', publicId: '', caption: '' });
+
 export default function AdminArticlesPage() {
-  const [title, setTitle] = useState('Making The World a Better Place');
+  const [language, setLanguage] = useState('en');
+  const [title, setTitle] = useState({ id: '', en: '' });
   const [activeTab, setActiveTab] = useState('Content');
   const [publishedGlobally, setPublishedGlobally] = useState(true);
   const [publishedEnglish, setPublishedEnglish] = useState(true);
-  
   const [metaForm, setMetaForm] = useState({ metaTitle: '', metaDescription: '', keywords: '' });
-  const [seoForm, setSeoForm] = useState({ slug: '', canonical: '', ogImage: '' });
-
+  const [seoForm, setSeoForm] = useState({ slug: '', canonical: '' });
+  const [author, setAuthor] = useState('Kulino Team');
+  const [category, setCategory] = useState('Berita');
+  const [tags, setTags] = useState([]);
+  const [tagInput, setTagInput] = useState('');
+  const [publishedAt, setPublishedAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [blocks, setBlocks] = useState([
-    { 
-      id: 1, 
-      type: 'text', 
-      title: 'Making The World a Better Place', 
-      content: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quis ipsum amet turpis nibh ipsum parturient donec. Ultrices porttitor nullam volutpat et in. Vitae quis tortor a odio tincidunt.' 
-    },
-    { 
-      id: 2, 
-      type: 'image', 
-      caption: '' 
-    }
+    { id: 'initial-text', type: 'text', title: '', content: '' },
+    { id: 'initial-image', type: 'image', url: '', publicId: '', caption: '' },
   ]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const fileInputs = useRef({});
 
-  const handleSave = () => {
+  const currentTitle = title[language];
+  const previewTitle = title[language] || title.id || title.en || 'Untitled article';
+  const firstImage = useMemo(() => blocks.find((block) => block.type === 'image' && block.url)?.url, [blocks]);
+
+  const updateBlock = (id, field, value) => {
+    setBlocks((current) => current.map((block) => block.id === id ? { ...block, [field]: value } : block));
+  };
+
+  const removeBlock = (id) => setBlocks((current) => current.filter((block) => block.id !== id));
+
+  const moveBlock = (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= blocks.length) return;
+    setBlocks((current) => {
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const appendFormatting = (id, text) => {
+    setBlocks((current) => current.map((block) => block.id === id
+      ? { ...block, content: `${block.content || ''}${block.content ? '\n' : ''}${text}` }
+      : block));
+  };
+
+  const uploadImage = async (blockId, file) => {
+    if (!file) return;
+    setMessage('Mengunggah gambar…');
     try {
-      const newArticle = {
-        id: 'custom-' + Date.now(),
-        title: { id: title, en: title },
-        excerpt: { 
-          id: blocks.find(b => b.type === 'text')?.content || 'No excerpt available.', 
-          en: blocks.find(b => b.type === 'text')?.content || 'No excerpt available.' 
-        },
-        date: new Date().toISOString().split('T')[0],
-        category: { id: metaForm.keywords || 'Berita', en: metaForm.keywords || 'News' },
-        image: '/images/bikes/roadbike.png' // Default placeholder image
-      };
-      
-      const existing = JSON.parse(localStorage.getItem('customArticles') || '[]');
-      localStorage.setItem('customArticles', JSON.stringify([newArticle, ...existing]));
-      alert('Article published successfully! Check the main Articles page.');
-    } catch (e) {
-      console.error(e);
-      alert('Failed to save article.');
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'kulino-pit/articles');
+      const response = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Upload gagal.');
+      setBlocks((current) => current.map((block) => block.id === blockId
+        ? { ...block, url: data.url, publicId: data.publicId }
+        : block));
+      setMessage('Gambar berhasil diunggah.');
+    } catch (error) {
+      setMessage(error.message);
     }
   };
 
-  const updateBlock = (id, field, val) => {
-    setBlocks(prev => prev.map(b => b.id === id ? { ...b, [field]: val } : b));
+  const addTag = () => {
+    const value = tagInput.trim();
+    if (value && !tags.includes(value)) setTags((current) => [...current, value]);
+    setTagInput('');
+  };
+
+  const saveArticle = async (status) => {
+    if (!title.id.trim() && !title.en.trim()) {
+      setMessage('Isi judul artikel terlebih dahulu.');
+      return;
+    }
+    setSaving(true);
+    setShowSaveMenu(false);
+    setMessage('');
+    try {
+      const response = await fetch('/api/articles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titleId: title.id || title.en,
+          titleEn: title.en || title.id,
+          slug: seoForm.slug,
+          canonical: seoForm.canonical,
+          blocks,
+          image: firstImage,
+          author,
+          categoryId: category,
+          categoryEn: category,
+          tags,
+          metaTitle: metaForm.metaTitle,
+          metaDescription: metaForm.metaDescription,
+          keywords: metaForm.keywords,
+          publishedGlobally,
+          publishedEnglish,
+          publishedAt,
+          status,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Artikel gagal disimpan.');
+      setMessage(status === 'published' ? `Artikel dipublikasikan: /artikel/${data.slug}` : 'Draft berhasil disimpan.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="bg-gray-50 min-h-[calc(100vh-4rem)] p-4 sm:p-6 font-sans">
-      {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <input 
-          type="text" 
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="flex-1 w-full sm:max-w-2xl px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-          placeholder="Article Title..."
+    <div className="min-h-[calc(100vh-4rem)] bg-gray-50 p-4 sm:p-6">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <input
+          value={currentTitle}
+          onChange={(event) => setTitle((current) => ({ ...current, [language]: event.target.value }))}
+          className="w-full flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 font-bold text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:max-w-2xl"
+          placeholder={language === 'id' ? 'Judul artikel…' : 'Article title…'}
         />
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => alert('Change language')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
-            English <ChevronDown size={16} />
-          </button>
-          <button type="button" onClick={() => alert('Preview mode')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
-            <Eye size={16} /> Preview
-          </button>
-          <div className="flex">
-            <button type="button" onClick={handleSave} className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-l-lg hover:bg-blue-700 shadow-sm">
-              Save
-            </button>
-            <button type="button" onClick={() => alert('More options')} className="px-2 py-2 bg-blue-600 border-l border-blue-700 text-white rounded-r-lg hover:bg-blue-700 shadow-sm">
-              <ChevronDown size={16} />
-            </button>
+        <div className="flex items-center gap-2">
+          <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm">
+            <option value="en">English</option>
+            <option value="id">Indonesia</option>
+          </select>
+          <button onClick={() => setShowPreview(true)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"><Eye size={16} /> Preview</button>
+          <div className="relative flex">
+            <button disabled={saving} onClick={() => saveArticle('published')} className="rounded-l-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Save size={15} className="mr-1 inline" />{saving ? 'Saving…' : 'Publish'}</button>
+            <button onClick={() => setShowSaveMenu((value) => !value)} className="rounded-r-lg border-l border-blue-700 bg-blue-600 px-3 text-white">▾</button>
+            {showSaveMenu && <div className="absolute right-0 top-11 z-20 w-40 rounded-xl border bg-white p-1 shadow-lg"><button onClick={() => saveArticle('draft')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50">Save as draft</button></div>}
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Main Editor Area */}
-        <div className="flex-1">
-          {/* Tabs */}
-          <div className="flex gap-1 mb-4 bg-white border border-gray-200 rounded-t-xl overflow-hidden p-1">
-            {['Content', 'Meta', 'SEO'].map(tab => (
-              <button 
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
-                  activeTab === tab ? 'bg-gray-50 text-blue-600 shadow-sm border border-gray-100' : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+      {message && <div className={`mb-4 rounded-xl border p-3 text-sm font-semibold ${message.includes('gagal') || message.includes('Isi ') ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{message}</div>}
+
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <main className="flex-1">
+          <div className="flex gap-1 rounded-t-xl border border-gray-200 bg-white p-1">
+            {['Content', 'Meta', 'SEO'].map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`rounded-lg px-6 py-2.5 text-sm font-semibold ${activeTab === tab ? 'border bg-gray-50 text-blue-600 shadow-sm' : 'text-gray-500'}`}>{tab}</button>)}
           </div>
-
-          <div className="bg-white border border-gray-200 border-t-0 p-6 rounded-b-xl shadow-sm min-h-[600px]">
-            {activeTab === 'Content' && (
-              <div className="space-y-6">
-                {blocks.map((block, index) => (
-                  <div key={block.id} className="border border-gray-100 rounded-xl bg-gray-50/30 overflow-hidden group">
-                    {/* Block Header */}
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white">
-                      <div className="flex items-center gap-2 text-blue-600 font-medium text-sm">
-                        <ChevronDown size={16} />
-                        {block.type === 'text' ? 'Text' : 'Image'}
-                      </div>
-                      <div className="flex items-center gap-1 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button type="button" className="p-1.5 hover:bg-red-50 hover:text-red-500 rounded"><Trash2 size={14} /></button>
-                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded"><ArrowDown size={14} /></button>
-                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded"><ArrowUp size={14} /></button>
-                        <button type="button" className="p-1.5 hover:bg-gray-100 rounded cursor-move"><Move size={14} /></button>
-                      </div>
-                    </div>
-
-                    {/* Block Content */}
-                    <div className="p-4 bg-white">
-                      {block.type === 'text' && (
-                        <div>
-                          {/* Toolbar */}
-                          <div className="flex items-center gap-1 mb-4 border border-gray-200 rounded-lg p-1 w-max">
-                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Type size={16} /></button>
-                            <div className="w-px h-4 bg-gray-200 mx-1"></div>
-                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Bold size={16} /></button>
-                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Italic size={16} /></button>
-                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><List size={16} /></button>
-                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Grid size={16} /></button>
-                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><LinkIcon size={16} /></button>
-                            <button type="button" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Code size={16} /></button>
-                          </div>
-                          
-                          <input 
-                            type="text" 
-                            value={block.title || ''} 
-                            onChange={(e) => updateBlock(block.id, 'title', e.target.value)}
-                            className="w-full font-bold text-xl text-gray-800 mb-3 focus:outline-none"
-                            placeholder="Heading..."
-                          />
-                          <textarea 
-                            className="w-full text-gray-600 focus:outline-none resize-none min-h-[100px]"
-                            value={block.content || ''}
-                            onChange={(e) => updateBlock(block.id, 'content', e.target.value)}
-                            placeholder="Start typing..."
-                          />
-                        </div>
-                      )}
-
-                      {block.type === 'image' && (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-4">
-                            <span className="text-sm font-medium text-gray-600 w-24">Upload image*</span>
-                            <div className="flex-1 border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center justify-center gap-2 text-blue-600 bg-blue-50/30 cursor-pointer hover:bg-blue-50">
-                              <ImageIcon size={20} />
-                              <span className="text-sm font-medium">Upload a file or drag and drop</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-sm font-medium text-gray-600 w-24">Caption</span>
-                            <input 
-                              type="text" 
-                              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
-                              value={block.caption || ''}
-                              onChange={(e) => updateBlock(block.id, 'caption', e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+          <div className="min-h-[600px] rounded-b-xl border border-t-0 border-gray-200 bg-white p-6 shadow-sm">
+            {activeTab === 'Content' && <div className="space-y-5">
+              {blocks.map((block, index) => <section key={block.id} className="overflow-hidden rounded-xl border border-gray-100">
+                <header className="flex items-center justify-between border-b bg-gray-50 px-4 py-2">
+                  <span className="text-sm font-semibold text-blue-600">{block.type === 'text' ? 'Text' : 'Image'}</span>
+                  <div className="flex gap-1 text-gray-500">
+                    <button title="Hapus blok" onClick={() => removeBlock(block.id)} className="rounded p-1.5 hover:bg-red-50 hover:text-red-500"><Trash2 size={14} /></button>
+                    <button title="Pindah ke bawah" disabled={index === blocks.length - 1} onClick={() => moveBlock(index, 1)} className="rounded p-1.5 hover:bg-white disabled:opacity-30"><ArrowDown size={14} /></button>
+                    <button title="Pindah ke atas" disabled={index === 0} onClick={() => moveBlock(index, -1)} className="rounded p-1.5 hover:bg-white disabled:opacity-30"><ArrowUp size={14} /></button>
                   </div>
-                ))}
-
-                <button type="button" onClick={() => alert('Add new block feature')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm mt-4">
-                  <Plus size={16} /> Add block
-                </button>
-              </div>
-            )}
-            
-            {activeTab === 'Meta' && (
-              <div className="space-y-6 animate-fade-in max-w-2xl">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Meta Title</label>
-                  <input 
-                    type="text" 
-                    value={metaForm.metaTitle}
-                    onChange={(e) => setMetaForm({...metaForm, metaTitle: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
-                    placeholder="Enter meta title..."
-                  />
+                </header>
+                <div className="p-4">
+                  {block.type === 'text' ? <>
+                    <div className="mb-4 flex w-max items-center gap-1 rounded-lg border p-1 text-gray-500">
+                      <button title="Heading" onClick={() => appendFormatting(block.id, '## Judul bagian')} className="rounded p-1.5 hover:bg-gray-100"><Type size={16} /></button>
+                      <button title="Bold" onClick={() => appendFormatting(block.id, '**teks tebal**')} className="rounded p-1.5 hover:bg-gray-100"><Bold size={16} /></button>
+                      <button title="Italic" onClick={() => appendFormatting(block.id, '*teks miring*')} className="rounded p-1.5 hover:bg-gray-100"><Italic size={16} /></button>
+                      <button title="List" onClick={() => appendFormatting(block.id, '- Item 1\n- Item 2')} className="rounded p-1.5 hover:bg-gray-100"><List size={16} /></button>
+                      <button title="Table" onClick={() => appendFormatting(block.id, '| Kolom 1 | Kolom 2 |\n| --- | --- |\n| Isi | Isi |')} className="rounded p-1.5 hover:bg-gray-100"><Grid size={16} /></button>
+                      <button title="Link" onClick={() => appendFormatting(block.id, '[Teks tautan](https://example.com)')} className="rounded p-1.5 hover:bg-gray-100"><LinkIcon size={16} /></button>
+                      <button title="Code" onClick={() => appendFormatting(block.id, '`kode`')} className="rounded p-1.5 hover:bg-gray-100"><Code size={16} /></button>
+                    </div>
+                    <input value={block.title || ''} onChange={(event) => updateBlock(block.id, 'title', event.target.value)} className="mb-3 w-full text-xl font-bold focus:outline-none" placeholder="Heading…" />
+                    <textarea value={block.content || ''} onChange={(event) => updateBlock(block.id, 'content', event.target.value)} className="min-h-36 w-full resize-y text-gray-600 focus:outline-none" placeholder="Start typing…" />
+                  </> : <div className="space-y-3">
+                    <input ref={(node) => { fileInputs.current[block.id] = node; }} type="file" accept="image/*" className="hidden" onChange={(event) => uploadImage(block.id, event.target.files?.[0])} />
+                    <button onClick={() => fileInputs.current[block.id]?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-blue-50/30 p-6 text-sm font-medium text-blue-600"><ImageIcon size={20} /> {block.url ? 'Ganti gambar' : 'Upload a file'}</button>
+                    {block.url && <img src={block.url} alt={block.caption || 'Preview'} className="max-h-64 rounded-xl object-cover" />}
+                    <input value={block.caption || ''} onChange={(event) => updateBlock(block.id, 'caption', event.target.value)} className="w-full rounded-lg border px-4 py-2" placeholder="Caption" />
+                  </div>}
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Meta Description</label>
-                  <textarea 
-                    value={metaForm.metaDescription}
-                    onChange={(e) => setMetaForm({...metaForm, metaDescription: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 h-24 resize-none"
-                    placeholder="Enter meta description..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Keywords</label>
-                  <input 
-                    type="text" 
-                    value={metaForm.keywords}
-                    onChange={(e) => setMetaForm({...metaForm, keywords: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
-                    placeholder="e.g. blog, travel, updates"
-                  />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'SEO' && (
-              <div className="space-y-6 animate-fade-in max-w-2xl">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">URL Slug</label>
-                  <input 
-                    type="text" 
-                    value={seoForm.slug}
-                    onChange={(e) => setSeoForm({...seoForm, slug: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
-                    placeholder="e.g. making-the-world-a-better-place"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Canonical URL</label>
-                  <input 
-                    type="text" 
-                    value={seoForm.canonical}
-                    onChange={(e) => setSeoForm({...seoForm, canonical: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
-                    placeholder="https://"
-                  />
-                </div>
-              </div>
-            )}
+              </section>)}
+              <div className="flex gap-2"><button onClick={() => setBlocks((current) => [...current, newTextBlock()])} className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"><Plus size={16} /> Text block</button><button onClick={() => setBlocks((current) => [...current, newImageBlock()])} className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"><Plus size={16} /> Image block</button></div>
+            </div>}
+            {activeTab === 'Meta' && <div className="max-w-2xl space-y-5">{[['Meta Title', 'metaTitle'], ['Keywords', 'keywords']].map(([label, key]) => <label key={key} className="block text-sm font-bold text-gray-700">{label}<input value={metaForm[key]} onChange={(event) => setMetaForm((current) => ({ ...current, [key]: event.target.value }))} className="mt-2 w-full rounded-lg border px-4 py-2 font-normal" /></label>)}<label className="block text-sm font-bold text-gray-700">Meta Description<textarea value={metaForm.metaDescription} onChange={(event) => setMetaForm((current) => ({ ...current, metaDescription: event.target.value }))} className="mt-2 h-28 w-full rounded-lg border px-4 py-2 font-normal" /></label></div>}
+            {activeTab === 'SEO' && <div className="max-w-2xl space-y-5"><label className="block text-sm font-bold">URL Slug<input value={seoForm.slug} onChange={(event) => setSeoForm((current) => ({ ...current, slug: event.target.value }))} className="mt-2 w-full rounded-lg border px-4 py-2 font-normal" placeholder="judul-artikel" /></label><label className="block text-sm font-bold">Canonical URL<input value={seoForm.canonical} onChange={(event) => setSeoForm((current) => ({ ...current, canonical: event.target.value }))} className="mt-2 w-full rounded-lg border px-4 py-2 font-normal" placeholder="https://" /></label></div>}
           </div>
-        </div>
+        </main>
 
-        {/* Right Sidebar */}
-        <div className="w-full lg:w-80 space-y-6">
-          {/* Author */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">Author</label>
-            <div className="relative">
-              <div className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg flex items-center justify-between cursor-pointer shadow-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded bg-gray-200 overflow-hidden">
-                    {/* Placeholder Avatar */}
-                    <div className="w-full h-full bg-blue-900 flex items-center justify-center text-white text-xs font-bold">DC</div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-700">David Clarke</span>
-                </div>
-                <ChevronDown size={16} className="text-gray-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Post Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">Post date</label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input type="text" value="02/12/2019" className="w-full px-3 py-2 pl-3 pr-8 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 shadow-sm focus:outline-none" readOnly />
-                <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              </div>
-              <div className="relative w-28">
-                <input type="text" value="16:00" className="w-full px-3 py-2 pl-3 pr-8 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 shadow-sm focus:outline-none" readOnly />
-                <Clock size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              </div>
-            </div>
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">Category</label>
-            <div className="w-full p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm flex items-center gap-2 flex-wrap">
-              <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
-                Big Data <button type="button" onClick={() => alert('Remove tag')} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
-              </span>
-              <button type="button" onClick={() => alert('Add tag')} className="ml-auto p-1 text-gray-400 hover:text-blue-500">
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Tag */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">Tag</label>
-            <div className="w-full p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm flex items-center gap-2 flex-wrap">
-              <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700">
-                Big Data <button type="button" onClick={() => alert('Remove tag')} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
-              </span>
-              <button type="button" onClick={() => alert('Add tag')} className="ml-auto p-1 text-gray-400 hover:text-blue-500">
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Toggles */}
-          <div className="space-y-4 pt-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Published globally</span>
-              <button 
-                type="button"
-                onClick={() => setPublishedGlobally(!publishedGlobally)}
-                className={`w-10 h-6 rounded-full flex items-center px-1 transition-colors ${publishedGlobally ? 'bg-green-400' : 'bg-gray-300'}`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${publishedGlobally ? 'translate-x-4' : 'translate-x-0'}`}></div>
-              </button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Published in English</span>
-              <button 
-                type="button"
-                onClick={() => setPublishedEnglish(!publishedEnglish)}
-                className={`w-10 h-6 rounded-full flex items-center px-1 transition-colors ${publishedEnglish ? 'bg-green-400' : 'bg-gray-300'}`}
-              >
-                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${publishedEnglish ? 'translate-x-4' : 'translate-x-0'}`}></div>
-              </button>
-            </div>
-          </div>
-        </div>
+        <aside className="w-full space-y-5 lg:w-80">
+          <label className="block text-sm font-medium text-gray-600">Author<input value={author} onChange={(event) => setAuthor(event.target.value)} className="mt-2 w-full rounded-lg border bg-white px-3 py-2 shadow-sm" /></label>
+          <label className="block text-sm font-medium text-gray-600">Post date<input type="datetime-local" value={publishedAt} onChange={(event) => setPublishedAt(event.target.value)} className="mt-2 w-full rounded-lg border bg-white px-3 py-2 shadow-sm" /></label>
+          <label className="block text-sm font-medium text-gray-600">Category<input value={category} onChange={(event) => setCategory(event.target.value)} className="mt-2 w-full rounded-lg border bg-white px-3 py-2 shadow-sm" /></label>
+          <div><label className="text-sm font-medium text-gray-600">Tags</label><div className="mt-2 flex gap-2"><input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addTag(); } }} className="min-w-0 flex-1 rounded-lg border px-3 py-2" /><button onClick={addTag} className="rounded-lg border bg-white px-3"><Plus size={16} /></button></div><div className="mt-2 flex flex-wrap gap-2">{tags.map((tag) => <button key={tag} onClick={() => setTags((current) => current.filter((item) => item !== tag))} className="rounded-full bg-gray-100 px-2 py-1 text-xs">{tag} ×</button>)}</div></div>
+          {[['Published globally', publishedGlobally, setPublishedGlobally], ['Published in English', publishedEnglish, setPublishedEnglish]].map(([label, value, setter]) => <div key={label} className="flex items-center justify-between"><span className="text-sm font-medium">{label}</span><button onClick={() => setter(!value)} className={`flex h-6 w-10 items-center rounded-full px-1 ${value ? 'bg-green-400' : 'bg-gray-300'}`}><span className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-4' : ''}`} /></button></div>)}
+        </aside>
       </div>
+
+      {showPreview && <div onClick={() => setShowPreview(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><article onClick={(event) => event.stopPropagation()} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-8 shadow-2xl"><button onClick={() => setShowPreview(false)} className="float-right rounded-full bg-gray-100 p-2"><X size={18} /></button><p className="text-xs font-bold uppercase text-blue-600">{category}</p><h1 className="mt-2 text-4xl font-black">{previewTitle}</h1><p className="mt-2 text-sm text-gray-500">{author} · {publishedAt.replace('T', ' ')}</p>{firstImage && <img src={firstImage} alt="Article preview" className="mt-6 max-h-96 w-full rounded-2xl object-cover" />}<div className="mt-6 space-y-5">{blocks.filter((block) => block.type === 'text').map((block) => <section key={block.id}>{block.title && <h2 className="text-2xl font-bold">{block.title}</h2>}<p className="mt-2 whitespace-pre-wrap leading-7 text-gray-700">{block.content}</p></section>)}</div></article></div>}
     </div>
   );
 }

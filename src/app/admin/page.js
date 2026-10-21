@@ -1,32 +1,60 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { formatCurrency, bikes, calendarBookings } from '@/lib/data';
+import { formatCurrency } from '@/lib/data';
 import Link from 'next/link';
 import { Activity, MapPin, AlertCircle, Wrench, ChevronRight } from 'lucide-react';
 
 export default function AdminOverviewPage() {
   const [visitorStats, setVisitorStats] = useState({ today: 0, total: 0 });
+  const [bookings, setBookings] = useState([]);
+  const [bikes, setBikes] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/visitors')
-      .then(res => res.json())
-      .then(data => setVisitorStats(data))
-      .catch(console.error);
+    Promise.all([
+      fetch('/api/visitors', { cache: 'no-store' }),
+      fetch('/api/bookings', { cache: 'no-store' }),
+      fetch('/api/bikes', { cache: 'no-store' }),
+      fetch('/api/partners', { cache: 'no-store' }),
+    ])
+      .then(async (responses) => {
+        const payloads = await Promise.all(responses.map((response) => response.json()));
+        const failed = responses.findIndex((response) => !response.ok);
+        if (failed >= 0) throw new Error(payloads[failed].error || 'Data dashboard gagal dimuat.');
+        setVisitorStats(payloads[0]);
+        setBookings(payloads[1]);
+        setBikes(payloads[2]);
+        setPartners(payloads[3]);
+      })
+      .catch((requestError) => setError(requestError.message));
   }, []);
 
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+  const recentBookings = bookings.slice(0, 4);
+  const todayPickups = bookings.filter((booking) => booking.date === today && booking.status !== 'Cancelled');
+  const pendingPartners = partners.filter((partner) => partner.status === 'Pending').length;
+  const revenue = bookings.filter((booking) => booking.status === 'Completed').reduce((sum, booking) => sum + booking.total, 0);
+
   const stats = [
-    { label: 'Total Revenue (Oct)', value: formatCurrency(12500000), trend: '+15%', isPositive: true },
+    { label: 'Total Revenue', value: formatCurrency(revenue), trend: 'Completed bookings', isPositive: true },
     { label: 'Today\'s Visitors', value: visitorStats.today.toLocaleString(), trend: `${visitorStats.total.toLocaleString()} Total`, isPositive: true },
-    { label: 'Available Fleet', value: `${bikes.filter(b => b.available).length}/${bikes.length}`, trend: '-2', isPositive: false },
-    { label: 'Pending Partners', value: '5', trend: 'Requires Review', isPositive: false },
+    { label: 'Available Fleet', value: `${bikes.filter(b => b.available).length}/${bikes.length}`, trend: `${bikes.filter(b => !b.available).length} unavailable`, isPositive: bikes.every((bike) => bike.available) },
+    { label: 'Pending Partners', value: String(pendingPartners), trend: 'Requires Review', isPositive: pendingPartners === 0 },
   ];
 
-  const recentBookings = [
-    { id: 'KP-827361', user: 'Budi Santoso', bike: 'Polygon Helios C8', status: 'Pending', total: 450000 },
-    { id: 'KP-827360', user: 'Andi Wijaya', bike: 'Giant Defy Advanced', status: 'Active', total: 600000 },
-    { id: 'KP-827359', user: 'Siti Nurhaliza', bike: 'Brompton M6L', status: 'Completed', total: 350000 },
-    { id: 'KP-827358', user: 'Reza Rahadian', bike: 'Trek Marlin 7', status: 'Completed', total: 200000 },
-  ];
+  const generateReport = () => {
+    const rows = [['Booking ID', 'Customer', 'Bike', 'Date', 'Status', 'Amount'], ...bookings.map((booking) => [
+      booking.id, booking.user, booking.bike, booking.date, booking.status, booking.total,
+    ])];
+    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kulino-pit-report-${today}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Dummy active riders for the map
   const activeRiders = [
@@ -42,7 +70,7 @@ export default function AdminOverviewPage() {
           <p className="text-sm text-gray-500 mt-1">Welcome back, here is what is happening today.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-5 py-2.5 text-sm font-semibold rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all">
+          <button onClick={generateReport} className="px-5 py-2.5 text-sm font-semibold rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-all">
             Generate Report
           </button>
           <Link href="/admin/bookings" className="px-5 py-2.5 text-sm font-semibold rounded-xl bg-[var(--color-primary)] text-white shadow-md hover:bg-[var(--color-primary-dark)] hover:shadow-lg transition-all">
@@ -50,6 +78,7 @@ export default function AdminOverviewPage() {
           </Link>
         </div>
       </header>
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
       {/* Stats Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -147,6 +176,9 @@ export default function AdminOverviewPage() {
                       <td className="p-4 text-sm font-bold text-gray-900">{formatCurrency(b.total)}</td>
                     </tr>
                   ))}
+                  {recentBookings.length === 0 && (
+                    <tr><td colSpan="5" className="p-8 text-center text-sm text-gray-500">Belum ada booking di database.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -165,7 +197,7 @@ export default function AdminOverviewPage() {
                   <AlertCircle size={16} />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-gray-900">5 Partner Applications</p>
+                  <p className="text-sm font-bold text-gray-900">{pendingPartners} Partner Applications</p>
                   <p className="text-xs text-gray-500 mt-0.5">Pending review and approval.</p>
                   <Link href="/admin/partners" className="text-[11px] font-bold text-[var(--color-primary)] mt-2 inline-block hover:underline">Review Now →</Link>
                 </div>
@@ -184,25 +216,26 @@ export default function AdminOverviewPage() {
           </div>
 
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <h2 className="font-display font-black text-lg text-gray-900 mb-4">Today's Pickups</h2>
+            <h2 className="font-display font-black text-lg text-gray-900 mb-4">Today&apos;s Pickups</h2>
             <div className="space-y-3">
-              {calendarBookings.slice(0,3).map((cb, i) => (
-                <div key={i} className="flex gap-4 items-center p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+              {todayPickups.slice(0, 3).map((cb) => (
+                <div key={cb.id} className="flex gap-4 items-center p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
                   <div className="w-12 h-12 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center">
                     📦
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{cb.bikeName}</p>
+                    <p className="text-sm font-bold text-gray-900">{cb.bike}</p>
                     <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                      User: {cb.userId} <span className="w-1 h-1 rounded-full bg-gray-300"></span> 09:00 AM
+                      {cb.user} <span className="w-1 h-1 rounded-full bg-gray-300"></span> {cb.time || 'Waktu belum diatur'}
                     </p>
                   </div>
                 </div>
               ))}
+              {todayPickups.length === 0 && <p className="py-6 text-center text-xs text-gray-500">Tidak ada pickup hari ini.</p>}
             </div>
-            <button className="w-full mt-4 py-3 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">
+            <Link href="/admin/bookings" className="block text-center w-full mt-4 py-3 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">
               View Schedule
-            </button>
+            </Link>
           </div>
         </div>
       </div>

@@ -364,6 +364,8 @@ export default function BookingPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [bikesList, setBikesList] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
     fetch('/api/bikes', { cache: 'no-store' })
@@ -387,10 +389,11 @@ export default function BookingPage() {
       if (rentalType === 'day') return dates.start && dates.end;
       return !!dates.start;
     }
+    if (step === 3) return Boolean(customerInfo.fullName?.trim() && customerInfo.phone?.trim() && customerInfo.email?.trim());
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const unitPrice = selectedBike ? getPriceByDuration(selectedBike, rentalType) : 0;
     let quantity = 1;
     if (rentalType === 'day' && dates.start && dates.end) {
@@ -410,7 +413,6 @@ export default function BookingPage() {
       qrisImage: ''
     };
 
-    const bookingId = `KP-${Date.now().toString().slice(-8)}`;
     const durationLabel = rentalDurations.find(d => d.key === rentalType)?.shortLabel || 'Sehari';
 
     let durationMinutes = 0;
@@ -420,29 +422,48 @@ export default function BookingPage() {
       durationMinutes = parseInt(rentalType.replace('h', '')) * 60;
     }
 
-    const newBooking = {
-      id: bookingId,
-      bike: selectedBike.name,
-      date: dates.start + (rentalType === 'day' && dates.end !== dates.start ? ` s/d ${dates.end}` : ''),
-      duration: durationLabel + (rentalType === 'day' && quantity > 1 ? ` (${quantity} hari)` : ''),
-      durationMinutes,
-      status: 'pending',
-      total: finalTotal,
-      points: 0
-    };
-
-    const existingHistory = JSON.parse(localStorage.getItem('memberBookings')) || [];
-    localStorage.setItem('memberBookings', JSON.stringify([newBooking, ...existingHistory]));
-
-    setPaymentDetails({
-      id: bookingId,
-      finalTotal,
-      uniqueCode,
-      method: customerInfo.paymentMethod || 'Bank Transfer',
-      settings: paymentSettings
-    });
-
-    setShowConfirm(true);
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: customerInfo.fullName,
+          customerPhone: customerInfo.phone,
+          customerEmail: customerInfo.email,
+          customerIdNumber: customerInfo.idNumber,
+          bikeId: selectedBike.id,
+          bikeName: selectedBike.name,
+          rentalDate: dates.start,
+          durationKey: rentalType,
+          durationLabel: durationLabel + (rentalType === 'day' && quantity > 1 ? ` (${quantity} hari)` : ''),
+          durationMinutes,
+          pickupMethod,
+          deliveryAddress: customerInfo.address,
+          accessories: selectedAccessories,
+          paymentMethod: customerInfo.paymentMethod || 'Bank Transfer',
+          uniqueCode,
+        }),
+      });
+      const newBooking = await response.json();
+      if (!response.ok) throw new Error(newBooking.error || 'Booking gagal disimpan.');
+      const memberBooking = { ...newBooking, status: newBooking.status.toLowerCase(), points: 0 };
+      const existingHistory = JSON.parse(localStorage.getItem('memberBookings') || '[]');
+      localStorage.setItem('memberBookings', JSON.stringify([memberBooking, ...existingHistory]));
+      setPaymentDetails({
+        id: newBooking.id,
+        finalTotal,
+        uniqueCode,
+        method: customerInfo.paymentMethod || 'Bank Transfer',
+        settings: paymentSettings
+      });
+      setShowConfirm(true);
+    } catch (requestError) {
+      setSubmitError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCopy = (text) => {
@@ -538,6 +559,7 @@ export default function BookingPage() {
           {step === 1 && <Step2 selectedBike={selectedBike} rentalType={rentalType} setRentalType={setRentalType} dates={dates} setDates={setDates} pickupMethod={pickupMethod} setPickupMethod={setPickupMethod} t={t} locale={locale} />}
           {step === 2 && <Step3 selectedAccessories={selectedAccessories} toggleAccessory={toggleAccessory} setSelectedAccessories={setSelectedAccessories} locale={locale} t={t} />}
           {step === 3 && <Step4 selectedBike={selectedBike} rentalType={rentalType} dates={dates} pickupMethod={pickupMethod} selectedAccessories={selectedAccessories} customerInfo={customerInfo} setCustomerInfo={setCustomerInfo} t={t} locale={locale} />}
+          {submitError && <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{submitError}</p>}
 
           {/* Navigation */}
           <div className="flex justify-between mt-10 pt-6 border-t border-gray-100">
@@ -550,8 +572,8 @@ export default function BookingPage() {
                 {t('booking.next')} →
               </button>
             ) : (
-              <button onClick={handleSubmit} className="px-8 py-3 rounded-xl font-semibold text-sm bg-[var(--color-primary)] text-white shadow-md hover:bg-[var(--color-primary-light)] transition-all flex items-center gap-2">
-                <CreditCard size={18} /> {t('booking.submit')}
+              <button disabled={submitting || !canNext()} onClick={handleSubmit} className="px-8 py-3 rounded-xl font-semibold text-sm bg-[var(--color-primary)] text-white shadow-md hover:bg-[var(--color-primary-light)] transition-all flex items-center gap-2 disabled:opacity-50">
+                <CreditCard size={18} /> {submitting ? 'Menyimpan…' : t('booking.submit')}
               </button>
             )}
           </div>

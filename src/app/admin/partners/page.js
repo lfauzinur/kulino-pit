@@ -1,54 +1,44 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, CheckCircle, XCircle, Clock, MessageCircle, Eye, X, Bike, Phone, MapPin, Calendar, Hash, Star, FileText, AlertCircle } from 'lucide-react';
 
-const initialPartners = [
-  { 
-    id: 'PR-101', name: 'Joko Widodo', phone: '08122334455', city: 'Banyuwangi',
-    bike: 'Trek Emonda SL6', category: 'Roadbike', condition: 'Baik', status: 'Pending', date: '2026-10-03',
-    email: 'joko.widodo@email.com', address: 'Jl. Ikan Tenggiri No. 12, Banyuwangi',
-    bikeBrand: 'Trek', bikeYear: '2023', bikeColor: 'Hitam/Merah', bikeFrame: '54cm',
-    bikeGroupset: 'Shimano 105 R7000', bikeBrake: 'Disc Brake', bikeWheel: '700c',
-    notes: 'Sepeda dalam kondisi prima, ban baru diganti bulan lalu.', joinReason: 'Ingin mendapat penghasilan tambahan dari sepeda yang jarang dipakai.',
-    idCard: 'KTP-3510XXXXXXXXXXXX', revenue: 0
-  },
-  { 
-    id: 'PR-100', name: 'Ahmad Dhani', phone: '08199887766', city: 'Banyuwangi',
-    bike: 'Polygon Siskiu T8', category: 'MTB', condition: 'Baru', status: 'Approved', date: '2026-10-01',
-    email: 'ahmad.dhani@email.com', address: 'Jl. Blambangan No. 45, Banyuwangi',
-    bikeBrand: 'Polygon', bikeYear: '2024', bikeColor: 'Hijau Botol', bikeFrame: 'L (19")',
-    bikeGroupset: 'Shimano Deore 12-speed', bikeBrake: 'Disc Brake Hydraulic', bikeWheel: '29"',
-    notes: 'Sepeda baru beli bulan Juni, masih bergaransi resmi.', joinReason: 'Ingin berbagi pengalaman bersepeda MTB di Banyuwangi kepada wisatawan.',
-    idCard: 'KTP-3510XXXXXXXXXXXX', revenue: 450000
-  },
-  { 
-    id: 'PR-099', name: 'Raisa Andriana', phone: '085544332211', city: 'Jember',
-    bike: 'Brompton Explore', category: 'Folding', condition: 'Baik', status: 'Approved', date: '2026-09-25',
-    email: 'raisa.a@email.com', address: 'Jl. Sultan Agung No. 7, Jember',
-    bikeBrand: 'Brompton', bikeYear: '2022', bikeColor: 'Metallic Silver', bikeFrame: 'One Size',
-    bikeGroupset: 'SRAM', bikeBrake: 'Caliper Brake', bikeWheel: '16"',
-    notes: 'Brompton edisi khusus, kondisi sangat baik, sudah diservis rutin.', joinReason: 'Tinggal di Jember tapi mau titip di Kulino Pit saat liburan.',
-    idCard: 'KTP-3509XXXXXXXXXXXX', revenue: 280000
-  },
-  { 
-    id: 'PR-098', name: 'Deddy Corbuzier', phone: '081122112211', city: 'Banyuwangi',
-    bike: 'Pacific Noris 2.0', category: 'Folding', condition: 'Cukup', status: 'Rejected', date: '2026-09-20',
-    email: 'deddy.c@email.com', address: 'Jl. Ahmad Yani No. 88, Banyuwangi',
-    bikeBrand: 'Pacific', bikeYear: '2019', bikeColor: 'Putih', bikeFrame: 'One Size',
-    bikeGroupset: 'Shimano Tourney', bikeBrake: 'V-Brake', bikeWheel: '20"',
-    notes: 'Ada beberapa goresan di frame, rantai perlu diganti.', joinReason: 'Sepeda sudah lama tidak dipakai, ingin menghasilkan dari aset.',
-    idCard: 'KTP-3510XXXXXXXXXXXX', revenue: 0
-  },
-];
-
 export default function AdminPartnersPage() {
-  const [partners, setPartners] = useState(initialPartners);
+  const [partners, setPartners] = useState([]);
   const [filter, setFilter] = useState('All');
   const [selectedPartner, setSelectedPartner] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [updatingId, setUpdatingId] = useState('');
 
-  const handleUpdateStatus = (id, newStatus) => {
-    setPartners(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
-    if (selectedPartner?.id === id) setSelectedPartner(prev => ({ ...prev, status: newStatus }));
+  useEffect(() => {
+    fetch('/api/partners', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Gagal memuat mitra.');
+        setPartners(data);
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleUpdateStatus = async (id, newStatus) => {
+    setUpdatingId(id);
+    setError('');
+    try {
+      const response = await fetch(`/api/partners/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const updated = await response.json();
+      if (!response.ok) throw new Error(updated.error || 'Status gagal diperbarui.');
+      setPartners((current) => current.map((partner) => partner.id === id ? updated : partner));
+      if (selectedPartner?.id === id) setSelectedPartner(updated);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setUpdatingId('');
+    }
   };
 
   const statusIcon = (status) => {
@@ -96,6 +86,7 @@ export default function AdminPartnersPage() {
           </div>
         )}
       </header>
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-4">
@@ -180,8 +171,8 @@ export default function AdminPartnersPage() {
                     <div className="flex items-center justify-end gap-2">
                       {p.status === 'Pending' && (
                         <>
-                          <button onClick={() => handleUpdateStatus(p.id, 'Approved')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all">Approve</button>
-                          <button onClick={() => handleUpdateStatus(p.id, 'Rejected')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all">Reject</button>
+                          <button disabled={updatingId === p.id} onClick={() => handleUpdateStatus(p.id, 'Approved')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all disabled:opacity-50">Approve</button>
+                          <button disabled={updatingId === p.id} onClick={() => handleUpdateStatus(p.id, 'Rejected')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">Reject</button>
                         </>
                       )}
                       {/* View Detail */}
@@ -208,12 +199,13 @@ export default function AdminPartnersPage() {
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-12">
             <Users size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 font-medium">No partner applications found.</p>
           </div>
         )}
+        {loading && <div className="py-12 text-center text-sm text-gray-500">Memuat pendaftaran dari database…</div>}
       </div>
 
       {/* ─── Partner Detail Modal ─── */}

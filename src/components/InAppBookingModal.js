@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -18,9 +18,9 @@ const accIcons = {
   repairkit: <Wrench size={18} className="text-[var(--color-primary)]" />
 };
 
-export default function InAppBookingModal({ bike, onClose, onSuccess }) {
+export default function InAppBookingModal({ bike, member, onClose, onSuccess }) {
   const [rentalType, setRentalType] = useState('2h');
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('06:30');
   const [pickupMethod, setPickupMethod] = useState('pickup');
   const [selectedAccessories, setSelectedAccessories] = useState([]);
@@ -28,12 +28,9 @@ export default function InAppBookingModal({ bike, onClose, onSuccess }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [bookingResult, setBookingResult] = useState(null);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    // Set default date to today in YYYY-MM-DD
-    const today = new Date().toISOString().split('T')[0];
-    setSelectedDate(today);
-  }, []);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [uniqueCode] = useState(10);
 
   if (!bike) return null;
 
@@ -54,12 +51,9 @@ export default function InAppBookingModal({ bike, onClose, onSuccess }) {
 
   const deliveryFee = pickupMethod === 'delivery' ? 50000 : 0;
   const subtotal = durationPrice + accessoryTotal + deliveryFee;
-  const uniqueCode = Math.floor(Math.random() * 90) + 10;
   const grandTotal = subtotal + uniqueCode;
 
-  const handleConfirmBooking = () => {
-    const bookingId = `KP-${Date.now().toString().slice(-7)}`;
-    
+  const handleConfirmBooking = async () => {
     let durationMinutes = 120;
     if (rentalType === 'day') {
       durationMinutes = 24 * 60;
@@ -67,38 +61,41 @@ export default function InAppBookingModal({ bike, onClose, onSuccess }) {
       durationMinutes = parseInt(rentalType.replace('h', '')) * 60;
     }
 
-    const newBooking = {
-      id: bookingId,
-      bike: bike.name,
-      date: selectedDate,
-      time: startTime,
-      duration: durationLabel,
-      durationMinutes,
-      activeSince: Date.now(), // starts right now for instant live timer demo
-      status: 'active', // active rental so user immediately sees live countdown
-      total: grandTotal,
-      points: 50,
-      pickupMethod,
-      paymentMethod,
-    };
-
-    // Save to localStorage
+    setSubmitting(true);
+    setSubmitError('');
     try {
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: member?.name || 'Member Kulino Pit',
+          customerPhone: member?.wa || member?.phone || '',
+          customerEmail: member?.email || '',
+          bikeId: bike.id,
+          bikeName: bike.name,
+          rentalDate: selectedDate,
+          startTime,
+          durationKey: rentalType,
+          durationLabel,
+          durationMinutes,
+          pickupMethod,
+          accessories: selectedAccessories,
+          paymentMethod,
+          uniqueCode,
+        }),
+      });
+      const newBooking = await response.json();
+      if (!response.ok) throw new Error(newBooking.error || 'Booking gagal disimpan.');
+      const memberBooking = { ...newBooking, status: newBooking.status.toLowerCase(), points: 0 };
       const existing = JSON.parse(localStorage.getItem('memberBookings') || '[]');
-      localStorage.setItem('memberBookings', JSON.stringify([newBooking, ...existing]));
-    } catch (e) {
-      console.warn('Failed saving booking:', e);
-    }
-
-    setBookingResult({
-      ...newBooking,
-      uniqueCode,
-      subtotal,
-    });
-    setIsSubmitted(true);
-
-    if (onSuccess) {
-      onSuccess(newBooking);
+      localStorage.setItem('memberBookings', JSON.stringify([memberBooking, ...existing]));
+      setBookingResult({ ...newBooking, uniqueCode, subtotal });
+      setIsSubmitted(true);
+      if (onSuccess) onSuccess(memberBooking);
+    } catch (requestError) {
+      setSubmitError(requestError.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -461,11 +458,13 @@ export default function InAppBookingModal({ bike, onClose, onSuccess }) {
                   </div>
                 </div>
 
+                {submitError && <p className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">{submitError}</p>}
                 <button
                   onClick={handleConfirmBooking}
-                  className="btn btn-primary w-full py-3.5 text-sm font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={submitting || !selectedDate}
+                  className="btn btn-primary w-full py-3.5 text-sm font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <CreditCard size={16} /> Konfirmasi & Sewa Sekarang
+                  <CreditCard size={16} /> {submitting ? 'Menyimpan…' : 'Konfirmasi & Sewa Sekarang'}
                 </button>
               </div>
             </>

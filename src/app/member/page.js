@@ -1859,16 +1859,12 @@ function SpinWheelAndPointsTab({ t, locale }) {
   const [prizes, setPrizes] = useState(defaultPrizes);
 
   useEffect(() => {
-    const stored = localStorage.getItem('spinPrizes_v2');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length >= 2) {
-          setTimeout(() => setPrizes(parsed), 0);
-          return;
-        }
-      } catch (e) { /* ignore */ }
-    }
+    fetch('/api/spin-prizes', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Failed to load prizes')))
+      .then((data) => {
+        if (Array.isArray(data) && data.length >= 2) setPrizes(data);
+      })
+      .catch(console.error);
   }, []);
 
   const SPIN_COST = 100;
@@ -2547,6 +2543,7 @@ export default function MemberPage() {
       {selectedBookingBike && (
         <InAppBookingModal
           bike={selectedBookingBike}
+          member={memberProfile}
           onClose={() => setSelectedBookingBike(null)}
           onSuccess={handleBookingSuccess}
         />

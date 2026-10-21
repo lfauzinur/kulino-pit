@@ -1,0 +1,34 @@
+import { NextResponse } from 'next/server';
+import { requireAdminSession } from '@/lib/admin-auth';
+import { bookingRow, ensureAppDatabase, sql } from '@/lib/app-database';
+
+const allowedStatuses = new Set(['Pending', 'Active', 'Completed', 'Cancelled']);
+
+export async function PATCH(request, { params }) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    await ensureAppDatabase();
+    const { id } = await params;
+    const { status } = await request.json();
+    if (!allowedStatuses.has(status)) {
+      return NextResponse.json({ error: 'Status tidak valid.' }, { status: 400 });
+    }
+
+    const rows = await sql`
+      UPDATE bookings
+      SET status = ${status},
+          active_since = CASE WHEN ${status} = 'Active' AND active_since IS NULL THEN NOW() ELSE active_since END,
+          updated_at = NOW()
+      WHERE booking_code = ${decodeURIComponent(id)}
+      RETURNING *
+    `;
+    if (!rows.length) return NextResponse.json({ error: 'Booking tidak ditemukan.' }, { status: 404 });
+    return NextResponse.json(bookingRow(rows[0]));
+  } catch (error) {
+    console.error('PATCH /api/bookings/[id] error:', error);
+    return NextResponse.json({ error: 'Status booking gagal diperbarui.' }, { status: 500 });
+  }
+}
