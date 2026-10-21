@@ -13,19 +13,39 @@ export default function AdminLayout({ children }) {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Basic auth check
-    const auth = localStorage.getItem('isAdmin');
-    if (!auth && pathname !== '/admin/login') {
-      router.push('/admin/login');
-    } else {
-      setIsAuthenticated(true);
+    if (pathname === '/admin/login') {
+      setIsChecking(false);
+      return;
     }
-    setIsChecking(false);
+
+    let cancelled = false;
+    const verifySession = async () => {
+      try {
+        const response = await fetch('/api/admin/session', {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        });
+        if (!response.ok) throw new Error('Unauthorized');
+        if (!cancelled) setIsAuthenticated(true);
+      } catch {
+        if (!cancelled) router.replace('/admin/login');
+      } finally {
+        if (!cancelled) setIsChecking(false);
+      }
+    };
+
+    verifySession();
+    return () => { cancelled = true; };
   }, [pathname, router]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/admin/session', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    }).catch(() => {});
     localStorage.removeItem('isAdmin');
-    router.push('/admin/login');
+    router.replace('/admin/login');
+    router.refresh();
   };
 
   // If we are on the login page, don't render the sidebar, just the content

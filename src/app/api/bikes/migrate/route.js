@@ -1,10 +1,15 @@
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
+import { requireAdminSession } from '@/lib/admin-auth';
 
 const sql = neon(process.env.DATABASE_URL);
 
 // POST /api/bikes/migrate → import bikes dari JSON (localStorage migration)
 export async function POST(request) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { bikes } = await request.json();
     if (!bikes || !Array.isArray(bikes)) {

@@ -42,8 +42,8 @@ export default function UnifiedLogin() {
     setTimeout(() => {
       const idStr = identifier.toLowerCase();
       if (idStr === 'admin') {
-        localStorage.setItem('isAdmin', 'true');
-        router.push(getRedirectUrl('admin'));
+        localStorage.removeItem('isAdmin');
+        router.push('/admin/login');
       } else if (idStr === 'partner') {
         localStorage.setItem('isPartner', 'true');
         router.push(getRedirectUrl('partner'));

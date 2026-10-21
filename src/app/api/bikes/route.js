@@ -1,7 +1,14 @@
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
+import { requireAdminSession } from '@/lib/admin-auth';
 
 const sql = neon(process.env.DATABASE_URL);
+
+export const dynamic = 'force-dynamic';
+
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, max-age=0',
+};
 
 // Helper: transform DB row → app bike object
 function rowToBike(row) {
@@ -35,15 +42,22 @@ export async function GET() {
     const rows = await sql`
       SELECT * FROM bikes ORDER BY sort_order ASC, id ASC
     `;
-    return NextResponse.json(rows.map(rowToBike));
+    return NextResponse.json(rows.map(rowToBike), { headers: noStoreHeaders });
   } catch (error) {
     console.error('GET /api/bikes error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500, headers: noStoreHeaders }
+    );
   }
 }
 
 // POST /api/bikes → tambah sepeda baru
 export async function POST(request) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const {

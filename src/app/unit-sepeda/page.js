@@ -14,9 +14,12 @@ export default function UnitSepedaPage() {
   const categories = ['all', 'roadbike', 'mtb', 'folding', 'ebike', 'city'];
 
   useEffect(() => {
-    fetch('/api/bikes')
-      .then(r => r.json())
-      .then(data => { setBikes(data); setLoading(false); })
+    fetch('/api/bikes', { cache: 'no-store' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => { setBikes(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 

@@ -348,8 +348,11 @@ export default function BookingPage() {
   const [bikesList, setBikesList] = useState([]);
 
   useEffect(() => {
-    fetch('/api/bikes')
-      .then(r => r.json())
+    fetch('/api/bikes', { cache: 'no-store' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => setBikesList(data))
       .catch(console.error);
   }, []);

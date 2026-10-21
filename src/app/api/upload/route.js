@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { NextResponse } from 'next/server';
+import { requireAdminSession } from '@/lib/admin-auth';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,6 +9,10 @@ cloudinary.config({
 });
 
 export async function POST(request) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get('file');
@@ -43,6 +48,10 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { publicId } = await request.json();
     if (!publicId) return NextResponse.json({ error: 'No publicId' }, { status: 400 });

@@ -241,8 +241,11 @@ function FeaturedBikes({ t }) {
   const [featured, setFeatured] = useState([]);
 
   useEffect(() => {
-    fetch('/api/bikes')
-      .then(r => r.json())
+    fetch('/api/bikes', { cache: 'no-store' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => setFeatured(data.slice(0, 3)))
       .catch(() => {});
   }, []);
@@ -538,8 +541,11 @@ export default function LandingPage() {
   const [heroBikeImage, setHeroBikeImage] = useState('/images/bikes/roadbike.png');
 
   useEffect(() => {
-    fetch('/api/bikes')
-      .then(r => r.json())
+    fetch('/api/bikes', { cache: 'no-store' })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(data => { if (data?.[0]?.image) setHeroBikeImage(data[0].image); })
       .catch(() => {});
   }, []);

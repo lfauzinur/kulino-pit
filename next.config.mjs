@@ -1,4 +1,10 @@
-import withPWAInit from '@ducanh2912/next-pwa';
+import withPWAInit, { runtimeCaching } from '@ducanh2912/next-pwa';
+
+// Database-backed API responses must always come from the network. The default
+// next-pwa rules cache same-origin GET /api requests for up to one day.
+const runtimeCachingWithoutApi = runtimeCaching.filter(
+  (entry) => entry.options?.cacheName !== 'apis'
+);
 
 const withPWA = withPWAInit({
   dest: 'public',
@@ -8,6 +14,7 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === 'development', // Disable PWA in development for better dev experience
   workboxOptions: {
     disableDevLogs: true,
+    runtimeCaching: runtimeCachingWithoutApi,
   },
 });
 

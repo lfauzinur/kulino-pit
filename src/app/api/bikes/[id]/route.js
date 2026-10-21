@@ -1,7 +1,15 @@
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
+import { requireAdminSession } from '@/lib/admin-auth';
 
 const sql = neon(process.env.DATABASE_URL);
+
+async function getBikeId(params) {
+  const { id: rawId } = await params;
+  const id = Number(rawId);
+
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
 
 function rowToBike(row) {
   return {
@@ -30,8 +38,16 @@ function rowToBike(row) {
 
 // PUT /api/bikes/[id] → update SEMUA field langsung (no COALESCE trick)
 export async function PUT(request, { params }) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const id = parseInt(params.id);
+    const id = await getBikeId(params);
+    if (!id) {
+      return NextResponse.json({ error: 'Invalid bike ID' }, { status: 400 });
+    }
+
     const body = await request.json();
 
     // Ambil data lama dulu sebagai fallback
@@ -95,13 +111,25 @@ export async function PUT(request, { params }) {
 
 // DELETE /api/bikes/[id] → hapus sepeda
 export async function DELETE(request, { params }) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
-    const id = parseInt(params.id);
-    const bike = await sql`SELECT image_public_id FROM bikes WHERE id = ${id}`;
-    if (bike.length === 0) {
+    const id = await getBikeId(params);
+    if (!id) {
+      return NextResponse.json({ error: 'Invalid bike ID' }, { status: 400 });
+    }
+
+    const deleted = await sql`
+      DELETE FROM bikes
+      WHERE id = ${id}
+      RETURNING id
+    `;
+    if (deleted.length === 0) {
       return NextResponse.json({ error: 'Bike not found' }, { status: 404 });
     }
-    await sql`DELETE FROM bikes WHERE id = ${id}`;
+
     return NextResponse.json({ success: true, deletedId: id });
   } catch (error) {
     console.error('DELETE /api/bikes/[id] error:', error);

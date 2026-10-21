@@ -4,14 +4,24 @@ import { formatCurrency } from '@/lib/data';
 import Image from 'next/image';
 import { Bike, Search, Settings, CheckCircle, XCircle, Flame, Trash2, Upload, ImageIcon, RefreshCw, Database, ArrowUpFromLine } from 'lucide-react';
 
+async function readApiResponse(response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Request gagal (HTTP ${response.status})`);
+  }
+  return data;
+}
+
 export default function AdminFleetPage() {
   const [fleet, setFleet] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [editingBike, setEditingBike] = useState(null);
+  const [operationError, setOperationError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAvail, setFilterAvail] = useState('all');
   const imgInputRef = useRef(null);
@@ -19,14 +29,17 @@ export default function AdminFleetPage() {
   // ─── Ambil semua sepeda dari database ───
   const fetchBikes = async () => {
     setLoading(true);
+    setOperationError('');
     try {
-      const res = await fetch('/api/bikes');
-      if (res.ok) {
-        const data = await res.json();
-        setFleet(data);
+      const res = await fetch('/api/bikes', { cache: 'no-store' });
+      const data = await readApiResponse(res);
+      if (!Array.isArray(data)) {
+        throw new Error('Format data sepeda dari server tidak valid.');
       }
+      setFleet(data);
     } catch (err) {
       console.error('Gagal fetch bikes:', err);
+      setOperationError(`Gagal memuat data: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -55,14 +68,10 @@ export default function AdminFleetPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bikes }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        alert(`Berhasil! ${data.results.length} sepeda sudah dipindahkan ke database.`);
-        await fetchBikes();
-        localStorage.removeItem('customBikes'); // bersihkan localStorage lama
-      } else {
-        alert('Gagal: ' + data.error);
-      }
+      const data = await readApiResponse(res);
+      alert(`Berhasil! ${data.results.length} sepeda sudah dipindahkan ke database.`);
+      await fetchBikes();
+      localStorage.removeItem('customBikes'); // bersihkan localStorage lama
     } catch (err) {
       alert('Error: ' + err.message);
     } finally {
@@ -73,34 +82,60 @@ export default function AdminFleetPage() {
   // ─── Toggle availability (langsung ke DB) ───
   const toggleAvailability = async (bike) => {
     const updated = { ...bike, available: !bike.available };
+    setOperationError('');
     setFleet(prev => prev.map(b => b.id === bike.id ? updated : b));
-    await fetch(`/api/bikes/${bike.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ available: updated.available }),
-    });
+    try {
+      const res = await fetch(`/api/bikes/${bike.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ available: updated.available }),
+      });
+      const saved = await readApiResponse(res);
+      setFleet(prev => prev.map(b => b.id === saved.id ? saved : b));
+    } catch (err) {
+      setFleet(prev => prev.map(b => b.id === bike.id ? bike : b));
+      setOperationError(`Status tidak tersimpan: ${err.message}`);
+    }
   };
 
   // ─── Toggle popular (langsung ke DB) ───
   const togglePopular = async (bike) => {
     const updated = { ...bike, popular: !bike.popular };
+    setOperationError('');
     setFleet(prev => prev.map(b => b.id === bike.id ? updated : b));
-    await fetch(`/api/bikes/${bike.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ popular: updated.popular }),
-    });
+    try {
+      const res = await fetch(`/api/bikes/${bike.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ popular: updated.popular }),
+      });
+      const saved = await readApiResponse(res);
+      setFleet(prev => prev.map(b => b.id === saved.id ? saved : b));
+    } catch (err) {
+      setFleet(prev => prev.map(b => b.id === bike.id ? bike : b));
+      setOperationError(`Status popular tidak tersimpan: ${err.message}`);
+    }
   };
 
   // ─── Hapus sepeda ───
   const handleDeleteBike = async (id) => {
-    await fetch(`/api/bikes/${id}`, { method: 'DELETE' });
-    setFleet(prev => prev.filter(b => b.id !== id));
-    setDeletingId(null);
+    setDeleting(true);
+    setOperationError('');
+    try {
+      const res = await fetch(`/api/bikes/${id}`, { method: 'DELETE' });
+      await readApiResponse(res);
+      setFleet(prev => prev.filter(b => b.id !== id));
+      setDeletingId(null);
+    } catch (err) {
+      setOperationError(`Sepeda gagal dihapus: ${err.message}`);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // ─── Tambah sepeda baru (state awal) ───
   const handleAddNewBike = () => {
+    setOperationError('');
     setEditingBike({
       id: null,
       name: '',
@@ -125,6 +160,10 @@ export default function AdminFleetPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const previousImage = editingBike.image;
+    const previousImagePublicId = editingBike.imagePublicId;
+    setOperationError('');
+
     // Preview lokal dulu
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -138,14 +177,22 @@ export default function AdminFleetPage() {
       formData.append('file', file);
       formData.append('folder', 'kulino-pit/bikes');
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        setEditingBike(prev => ({ ...prev, image: data.url, imagePublicId: data.publicId }));
+      const data = await readApiResponse(res);
+      if (!data.url) {
+        throw new Error('Server tidak mengembalikan URL gambar.');
       }
+      setEditingBike(prev => ({ ...prev, image: data.url, imagePublicId: data.publicId }));
     } catch (err) {
       console.warn('Cloudinary upload failed:', err);
+      setEditingBike(prev => ({
+        ...prev,
+        image: previousImage,
+        imagePublicId: previousImagePublicId,
+      }));
+      setOperationError(`Gambar gagal diunggah: ${err.message}`);
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -153,6 +200,7 @@ export default function AdminFleetPage() {
   const handleEditSave = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setOperationError('');
     try {
       const isNew = !editingBike.id;
       const url = isNew ? '/api/bikes' : `/api/bikes/${editingBike.id}`;
@@ -164,17 +212,16 @@ export default function AdminFleetPage() {
         body: JSON.stringify(editingBike),
       });
 
-      if (res.ok) {
-        const saved = await res.json();
-        if (isNew) {
-          setFleet(prev => [saved, ...prev]);
-        } else {
-          setFleet(prev => prev.map(b => b.id === saved.id ? saved : b));
-        }
-        setEditingBike(null);
+      const saved = await readApiResponse(res);
+      if (isNew) {
+        setFleet(prev => [saved, ...prev]);
+      } else {
+        setFleet(prev => prev.map(b => b.id === saved.id ? saved : b));
       }
+      setEditingBike(null);
     } catch (err) {
       console.error('Save failed:', err);
+      setOperationError(`Perubahan gagal disimpan: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -228,6 +275,12 @@ export default function AdminFleetPage() {
           </button>
         </div>
       </header>
+
+      {operationError && (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          {operationError}
+        </div>
+      )}
 
       {/* Stats + Filter */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -327,10 +380,10 @@ export default function AdminFleetPage() {
                     <h3 className="font-display font-black text-sm text-gray-900 mt-0.5">{bike.name}</h3>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setEditingBike(bike)} className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="Edit Bike">
+                    <button onClick={() => { setOperationError(''); setEditingBike(bike); }} className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="Edit Bike">
                       <Settings size={15} />
                     </button>
-                    <button onClick={() => setDeletingId(bike.id)} className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus Sepeda">
+                    <button onClick={() => { setOperationError(''); setDeletingId(bike.id); }} className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus Sepeda">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -404,9 +457,16 @@ export default function AdminFleetPage() {
             <p className="text-sm text-gray-500 mb-5">
               Sepeda <strong>{fleet.find(b => b.id === deletingId)?.name}</strong> akan dihapus permanen dari database.
             </p>
+            {operationError && (
+              <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-left text-xs font-semibold text-red-700">
+                {operationError}
+              </div>
+            )}
             <div className="flex gap-3">
-              <button onClick={() => setDeletingId(null)} className="btn flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50">Batal</button>
-              <button onClick={() => handleDeleteBike(deletingId)} className="btn flex-1 bg-red-500 hover:bg-red-600 text-white">Hapus</button>
+              <button disabled={deleting} onClick={() => setDeletingId(null)} className="btn flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">Batal</button>
+              <button disabled={deleting} onClick={() => handleDeleteBike(deletingId)} className="btn flex-1 bg-red-500 hover:bg-red-600 text-white disabled:opacity-50">
+                {deleting ? 'Menghapus...' : 'Hapus'}
+              </button>
             </div>
           </div>
         </div>
@@ -434,6 +494,12 @@ export default function AdminFleetPage() {
             </div>
             <div className="overflow-y-auto p-6 pt-4">
             <form onSubmit={handleEditSave} className="space-y-4">
+
+              {operationError && (
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                  {operationError}
+                </div>
+              )}
 
               {/* Image Upload */}
               <div>
