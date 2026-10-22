@@ -103,10 +103,48 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`ALTER TABLE bikes ADD COLUMN IF NOT EXISTS stock_count INTEGER NOT NULL DEFAULT 1`;
+      await sql`UPDATE bikes SET stock_count = 1 WHERE stock_count IS NULL OR stock_count < 0`;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS tour_categories (
+          id BIGSERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS tour_packages (
+          id BIGSERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          price INTEGER NOT NULL DEFAULT 0,
+          category_id BIGINT NOT NULL REFERENCES tour_categories(id) ON DELETE RESTRICT,
+          duration TEXT NOT NULL DEFAULT '',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_categories_name_lower_idx ON tour_categories (LOWER(name))`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_name_lower_idx ON tour_packages (LOWER(name))`;
+      await sql`INSERT INTO tour_categories (name) VALUES ('Group Tours'), ('Private Tours') ON CONFLICT DO NOTHING`;
+      await sql`
+        INSERT INTO tour_packages (name, price, category_id, duration)
+        SELECT 'Banyuwangi City Tour', 150000, id, '4 Hours'
+        FROM tour_categories
+        WHERE name = 'Group Tours'
+          AND NOT EXISTS (SELECT 1 FROM tour_packages WHERE name = 'Banyuwangi City Tour')
+        LIMIT 1
+        ON CONFLICT DO NOTHING
+      `;
+
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS partner_status_idx ON partner_applications (status)`;
       await sql`CREATE INDEX IF NOT EXISTS articles_status_idx ON articles (status, published_at DESC)`;
+      await sql`CREATE INDEX IF NOT EXISTS tour_packages_category_idx ON tour_packages (category_id)`;
     })().catch((error) => {
       schemaPromise = undefined;
       throw error;
@@ -136,6 +174,39 @@ export function bookingRow(row) {
     status: row.status,
     activeSince: row.active_since ? new Date(row.active_since).getTime() : null,
     createdAt: row.created_at,
+  };
+}
+
+export function bikeRow(row) {
+  const stockCount = Math.max(0, Number(row.stock_count ?? 1));
+  const rentedCount = Math.max(0, Number(row.active_count || 0));
+  const availableStock = Math.max(0, stockCount - rentedCount);
+  const manualAvailable = Boolean(row.available);
+  return {
+    id: Number(row.id),
+    name: row.name,
+    category: row.category,
+    image: row.image,
+    imagePublicId: row.image_public_id,
+    frameSize: Array.isArray(row.frame_size) ? row.frame_size : (row.frame_size ? JSON.parse(row.frame_size) : ['M']),
+    pricePerDay: Number(row.price_per_day),
+    price2h: Number(row.price_2h),
+    price3h: Number(row.price_3h),
+    price4h: Number(row.price_4h),
+    price6h: Number(row.price_6h),
+    popular: Boolean(row.popular),
+    available: manualAvailable && availableStock > 0,
+    manualAvailable,
+    stockCount,
+    rentedCount,
+    availableStock,
+    description: { id: row.description_id, en: row.description_en },
+    specs: {
+      weight: row.spec_weight,
+      groupset: row.spec_groupset,
+      brake: row.spec_brake,
+      wheel: row.spec_wheel,
+    },
   };
 }
 

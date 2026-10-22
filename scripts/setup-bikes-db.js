@@ -22,6 +22,7 @@ async function setup() {
       price_6h INTEGER DEFAULT 0,
       popular BOOLEAN DEFAULT false,
       available BOOLEAN DEFAULT true,
+      stock_count INTEGER NOT NULL DEFAULT 1,
       description_id TEXT DEFAULT '',
       description_en TEXT DEFAULT '',
       spec_weight TEXT DEFAULT '',

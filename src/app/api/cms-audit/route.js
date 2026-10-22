@@ -88,7 +88,8 @@ export async function GET(request) {
       Promise.all(publicPages.map((page) => inspectPage(baseUrl, page))),
       sql`
         SELECT
-          (SELECT COUNT(*) FROM bikes)::int AS bikes,
+          (SELECT COALESCE(SUM(stock_count), 0) FROM bikes)::int AS bikes,
+          (SELECT COUNT(*) FROM bikes)::int AS bike_models,
           (SELECT COUNT(*) FROM bookings)::int AS bookings,
           (SELECT COUNT(*) FROM partner_applications)::int AS partners,
           (SELECT COUNT(*) FROM articles)::int AS articles,
@@ -148,6 +149,7 @@ export async function GET(request) {
         reachable,
         averageSeo,
         bikes: Number(count.bikes),
+        bikeModels: Number(count.bike_models),
         bookings: Number(count.bookings),
         partners: Number(count.partners),
         articles: Number(count.articles),

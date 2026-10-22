@@ -34,6 +34,8 @@ export default function AdminOverviewPage() {
   const recentBookings = bookings.slice(0, 4);
   const todayPickups = bookings.filter((booking) => booking.date === today && booking.status !== 'Cancelled');
   const pendingPartners = partners.filter((partner) => partner.status === 'Pending').length;
+  const totalFleetUnits = bikes.reduce((sum, bike) => sum + (bike.stockCount || 0), 0);
+  const availableFleetUnits = bikes.reduce((sum, bike) => sum + (bike.available ? (bike.availableStock || 0) : 0), 0);
   const revenue = bookings
     .filter((booking) => ['Active', 'Completed'].includes(booking.status))
     .reduce((sum, booking) => sum + booking.total, 0);
@@ -41,7 +43,7 @@ export default function AdminOverviewPage() {
   const stats = [
     { label: 'Total Revenue', value: formatCurrency(revenue), trend: 'Active + completed bookings', isPositive: true },
     { label: 'Today\'s Visitors', value: visitorStats.today.toLocaleString(), trend: `${visitorStats.total.toLocaleString()} Total`, isPositive: true },
-    { label: 'Available Fleet', value: `${bikes.filter(b => b.available).length}/${bikes.length}`, trend: `${bikes.filter(b => !b.available).length} unavailable`, isPositive: bikes.every((bike) => bike.available) },
+    { label: 'Available Fleet', value: `${availableFleetUnits}/${totalFleetUnits}`, trend: 'Available units / total stock', isPositive: availableFleetUnits > 0 },
     { label: 'Pending Partners', value: String(pendingPartners), trend: 'Requires Review', isPositive: pendingPartners === 0 },
   ];
 

@@ -38,11 +38,15 @@ export async function POST(request) {
     }
 
     const bikes = await sql`
-      SELECT id, name, available, price_per_day, price_2h, price_3h, price_4h, price_6h
-      FROM bikes WHERE id = ${bikeId}
+      SELECT b.id, b.name, b.available, b.stock_count, b.price_per_day, b.price_2h, b.price_3h, b.price_4h, b.price_6h,
+             COUNT(bookings.id) FILTER (WHERE bookings.status = 'Active')::int AS active_count
+      FROM bikes b
+      LEFT JOIN bookings ON bookings.bike_id = b.id
+      WHERE b.id = ${bikeId}
+      GROUP BY b.id
     `;
-    if (!bikes.length || !bikes[0].available) {
-      return NextResponse.json({ error: 'Unit sepeda tidak ditemukan atau sedang tidak tersedia.' }, { status: 409 });
+    if (!bikes.length || !bikes[0].available || Number(bikes[0].active_count) >= Number(bikes[0].stock_count)) {
+      return NextResponse.json({ error: 'Unit sepeda tidak ditemukan atau stok sedang habis.' }, { status: 409 });
     }
     const bike = bikes[0];
     const durationKey = ['2h', '3h', '4h', '6h', 'day'].includes(body.durationKey) ? body.durationKey : 'day';

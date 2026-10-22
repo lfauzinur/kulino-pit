@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { formatCurrency } from '@/lib/data';
 import Image from 'next/image';
-import { Bike, Search, Settings, CheckCircle, XCircle, Flame, Trash2, Upload, ImageIcon, RefreshCw, Database, ArrowUpFromLine } from 'lucide-react';
+import { Bike, Search, Settings, CheckCircle, XCircle, Flame, Trash2, Upload, ImageIcon, RefreshCw, Database, ArrowUpFromLine, Boxes } from 'lucide-react';
 
 async function readApiResponse(response) {
   const data = await response.json().catch(() => ({}));
@@ -45,7 +45,7 @@ export default function AdminFleetPage() {
     }
   };
 
-  useEffect(() => { fetchBikes(); }, []);
+  useEffect(() => { Promise.resolve().then(() => fetchBikes()); }, []);
 
   // ─── Migrate dari localStorage ke database ───
   const handleMigrateFromLocalStorage = async () => {
@@ -81,14 +81,15 @@ export default function AdminFleetPage() {
 
   // ─── Toggle availability (langsung ke DB) ───
   const toggleAvailability = async (bike) => {
-    const updated = { ...bike, available: !bike.available };
+    const manualAvailable = !bike.manualAvailable;
+    const updated = { ...bike, manualAvailable, available: manualAvailable && bike.availableStock > 0 };
     setOperationError('');
     setFleet(prev => prev.map(b => b.id === bike.id ? updated : b));
     try {
       const res = await fetch(`/api/bikes/${bike.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ available: updated.available }),
+        body: JSON.stringify({ available: manualAvailable }),
       });
       const saved = await readApiResponse(res);
       setFleet(prev => prev.map(b => b.id === saved.id ? saved : b));
@@ -147,6 +148,10 @@ export default function AdminFleetPage() {
       price6h: 50000,
       popular: false,
       available: true,
+      manualAvailable: true,
+      stockCount: 1,
+      rentedCount: 0,
+      availableStock: 1,
       image: '',
       imagePublicId: null,
       frameSize: ['M'],
@@ -236,8 +241,9 @@ export default function AdminFleetPage() {
     return matchSearch && matchFilter;
   });
 
-  const availCount = fleet.filter(b => b.available).length;
-  const rentedCount = fleet.filter(b => !b.available).length;
+  const totalStock = fleet.reduce((sum, bike) => sum + (bike.stockCount || 0), 0);
+  const availCount = fleet.reduce((sum, bike) => sum + (bike.availableStock || 0), 0);
+  const rentedCount = fleet.reduce((sum, bike) => sum + (bike.rentedCount || 0), 0);
   const popularCount = fleet.filter(b => b.popular).length;
 
   return (
@@ -286,9 +292,9 @@ export default function AdminFleetPage() {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex gap-3 flex-wrap">
           {[
-            { label: 'All', value: 'all', count: fleet.length },
-            { label: 'Available', value: 'available', count: availCount },
-            { label: 'Rented', value: 'rented', count: rentedCount },
+            { label: 'All Units', value: 'all', count: totalStock },
+            { label: 'Available Units', value: 'available', count: availCount },
+            { label: 'Rented Units', value: 'rented', count: rentedCount },
           ].map(f => (
             <button
               key={f.value}
@@ -362,7 +368,7 @@ export default function AdminFleetPage() {
                       ? 'bg-green-50 text-green-600 border border-green-200'
                       : 'bg-red-50 text-red-600 border border-red-200'}`}>
                     {bike.available ? <CheckCircle size={10} /> : <XCircle size={10} />}
-                    {bike.available ? 'Available' : 'Rented'}
+                    {bike.available ? 'Available' : bike.availableStock === 0 ? 'Stok Habis' : 'Nonaktif'}
                   </span>
                 </div>
                 {/* Cloudinary badge */}
@@ -413,6 +419,12 @@ export default function AdminFleetPage() {
                   </div>
                 </div>
 
+                <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+                  <div className="text-center"><p className="text-[8px] font-bold uppercase text-blue-400">Total Unit</p><p className="font-display text-lg font-black text-blue-900">{bike.stockCount}</p></div>
+                  <div className="border-x border-blue-100 text-center"><p className="text-[8px] font-bold uppercase text-green-500">Tersedia</p><p className="font-display text-lg font-black text-green-700">{bike.availableStock}</p></div>
+                  <div className="text-center"><p className="text-[8px] font-bold uppercase text-amber-500">Disewa</p><p className="font-display text-lg font-black text-amber-700">{bike.rentedCount}</p></div>
+                </div>
+
                 <div className="mt-auto pt-3 border-t border-dashed border-gray-200 flex justify-between items-center gap-2 flex-wrap">
                   <button
                     onClick={() => togglePopular(bike)}
@@ -426,11 +438,11 @@ export default function AdminFleetPage() {
                   <button
                     onClick={() => toggleAvailability(bike)}
                     className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-all
-                      ${bike.available
+                      ${bike.manualAvailable
                         ? 'text-red-600 hover:bg-red-50'
                         : 'text-green-600 hover:bg-green-50'}`}
                   >
-                    {bike.available ? 'Mark Unavailable' : 'Mark Available'}
+                    {bike.manualAvailable ? 'Nonaktifkan Unit' : 'Aktifkan Unit'}
                   </button>
                 </div>
               </div>
@@ -549,6 +561,12 @@ export default function AdminFleetPage() {
                   value={editingBike.name}
                   onChange={e => setEditingBike({ ...editingBike, name: e.target.value })}
                 />
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <label className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-800"><Boxes size={15} /> Jumlah Stok / Unit</label>
+                <input type="number" min="0" step="1" required className="clean-input !border-blue-200 bg-white" value={editingBike.stockCount ?? 1} onChange={(event) => setEditingBike({ ...editingBike, stockCount: Math.max(0, Number.parseInt(event.target.value, 10) || 0) })} />
+                <p className="mt-2 text-[10px] leading-4 text-blue-600">Unit tersedia dihitung otomatis dari stok total dikurangi booking berstatus Active.</p>
               </div>
 
               {/* Pricing Tiers */}

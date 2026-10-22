@@ -1,8 +1,6 @@
-import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
-
-const sql = neon(process.env.DATABASE_URL);
+import { ensureAppDatabase, sql } from '@/lib/app-database';
 
 // POST /api/bikes/migrate → import bikes dari JSON (localStorage migration)
 export async function POST(request) {
@@ -11,6 +9,7 @@ export async function POST(request) {
   }
 
   try {
+    await ensureAppDatabase();
     const { bikes } = await request.json();
     if (!bikes || !Array.isArray(bikes)) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
@@ -18,6 +17,8 @@ export async function POST(request) {
 
     const results = [];
     for (const bike of bikes) {
+      const parsedStock = Number(bike.stockCount);
+      const stockCount = Number.isSafeInteger(parsedStock) && parsedStock >= 0 ? parsedStock : 1;
       // Cek apakah sudah ada berdasarkan nama
       const existing = await sql`SELECT id FROM bikes WHERE name = ${bike.name} LIMIT 1`;
       
@@ -35,6 +36,7 @@ export async function POST(request) {
             price_6h = ${bike.price6h || 0},
             popular = ${bike.popular || false},
             available = ${bike.available !== false},
+            stock_count = ${stockCount},
             description_id = ${bike.description?.id || ''},
             description_en = ${bike.description?.en || ''},
             spec_weight = ${bike.specs?.weight || ''},
@@ -55,7 +57,7 @@ export async function POST(request) {
           INSERT INTO bikes (
             name, category, image, image_public_id, frame_size,
             price_per_day, price_2h, price_3h, price_4h, price_6h,
-            popular, available,
+            popular, available, stock_count,
             description_id, description_en,
             spec_weight, spec_groupset, spec_brake, spec_wheel,
             sort_order
@@ -64,7 +66,7 @@ export async function POST(request) {
             ${bike.imagePublicId || null}, ${JSON.stringify(bike.frameSize || ['M'])},
             ${bike.pricePerDay || 0}, ${bike.price2h || 0}, ${bike.price3h || 0},
             ${bike.price4h || 0}, ${bike.price6h || 0},
-            ${bike.popular || false}, ${bike.available !== false},
+            ${bike.popular || false}, ${bike.available !== false}, ${stockCount},
             ${bike.description?.id || ''}, ${bike.description?.en || ''},
             ${bike.specs?.weight || ''}, ${bike.specs?.groupset || ''},
             ${bike.specs?.brake || ''}, ${bike.specs?.wheel || ''},

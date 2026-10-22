@@ -1,39 +1,12 @@
-import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
-
-const sql = neon(process.env.DATABASE_URL);
+import { bikeRow, ensureAppDatabase, sql } from '@/lib/app-database';
 
 async function getBikeId(params) {
   const { id: rawId } = await params;
   const id = Number(rawId);
 
   return Number.isSafeInteger(id) && id > 0 ? id : null;
-}
-
-function rowToBike(row) {
-  return {
-    id: row.id,
-    name: row.name,
-    category: row.category,
-    image: row.image,
-    imagePublicId: row.image_public_id,
-    frameSize: Array.isArray(row.frame_size) ? row.frame_size : (row.frame_size ? JSON.parse(row.frame_size) : ['M']),
-    pricePerDay: row.price_per_day,
-    price2h: row.price_2h,
-    price3h: row.price_3h,
-    price4h: row.price_4h,
-    price6h: row.price_6h,
-    popular: row.popular,
-    available: row.available,
-    description: { id: row.description_id, en: row.description_en },
-    specs: {
-      weight: row.spec_weight,
-      groupset: row.spec_groupset,
-      brake: row.spec_brake,
-      wheel: row.spec_wheel,
-    },
-  };
 }
 
 // PUT /api/bikes/[id] → update SEMUA field langsung (no COALESCE trick)
@@ -43,6 +16,7 @@ export async function PUT(request, { params }) {
   }
 
   try {
+    await ensureAppDatabase();
     const id = await getBikeId(params);
     if (!id) {
       return NextResponse.json({ error: 'Invalid bike ID' }, { status: 400 });
@@ -69,7 +43,13 @@ export async function PUT(request, { params }) {
     const price4h     = body.price4h      ?? cur.price_4h;
     const price6h     = body.price6h      ?? cur.price_6h;
     const popular     = typeof body.popular   === 'boolean' ? body.popular   : cur.popular;
-    const available   = typeof body.available === 'boolean' ? body.available : cur.available;
+    const available   = typeof body.manualAvailable === 'boolean'
+      ? body.manualAvailable
+      : typeof body.available === 'boolean' ? body.available : cur.available;
+    const stockCount  = body.stockCount ?? cur.stock_count ?? 1;
+    if (!Number.isSafeInteger(Number(stockCount)) || Number(stockCount) < 0) {
+      return NextResponse.json({ error: 'Jumlah stok harus berupa bilangan bulat minimal 0.' }, { status: 400 });
+    }
     const descId      = body.description?.id  ?? cur.description_id;
     const descEn      = body.description?.en  ?? cur.description_en;
     const specWeight  = body.specs?.weight    ?? cur.spec_weight;
@@ -77,7 +57,7 @@ export async function PUT(request, { params }) {
     const specBrake   = body.specs?.brake     ?? cur.spec_brake;
     const specWheel   = body.specs?.wheel     ?? cur.spec_wheel;
 
-    const rows = await sql`
+    await sql`
       UPDATE bikes SET
         name          = ${name},
         category      = ${category},
@@ -91,6 +71,7 @@ export async function PUT(request, { params }) {
         price_6h      = ${price6h},
         popular       = ${popular},
         available     = ${available},
+        stock_count   = ${Number(stockCount)},
         description_id  = ${descId},
         description_en  = ${descEn},
         spec_weight   = ${specWeight},
@@ -99,10 +80,15 @@ export async function PUT(request, { params }) {
         spec_wheel    = ${specWheel},
         updated_at    = NOW()
       WHERE id = ${id}
-      RETURNING *
     `;
-
-    return NextResponse.json(rowToBike(rows[0]));
+    const rows = await sql`
+      SELECT b.*, COUNT(bookings.id) FILTER (WHERE bookings.status = 'Active')::int AS active_count
+      FROM bikes b
+      LEFT JOIN bookings ON bookings.bike_id = b.id
+      WHERE b.id = ${id}
+      GROUP BY b.id
+    `;
+    return NextResponse.json(bikeRow(rows[0]));
   } catch (error) {
     console.error('PUT /api/bikes/[id] error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -116,6 +102,7 @@ export async function DELETE(request, { params }) {
   }
 
   try {
+    await ensureAppDatabase();
     const id = await getBikeId(params);
     if (!id) {
       return NextResponse.json({ error: 'Invalid bike ID' }, { status: 400 });

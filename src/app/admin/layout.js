@@ -4,17 +4,17 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { I18nProvider } from '@/lib/i18n';
-import { LayoutDashboard, CalendarDays, Bike, Users, FileText, LogOut, ShieldAlert, RotateCcw, Map, Shield, Navigation2 } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bike, Users, FileText, LogOut, ShieldAlert, RotateCcw, Map, Shield, Navigation2, Menu, X } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (pathname === '/admin/login') {
-      setIsChecking(false);
       return;
     }
 
@@ -72,11 +72,22 @@ export default function AdminLayout({ children }) {
 
   return (
     <I18nProvider>
-      <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      <div className="min-h-screen bg-gray-50">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-gray-100 bg-white px-4 shadow-sm md:hidden">
+          <Link href="/admin" className="flex items-center gap-2">
+            <div className="relative h-9 w-9"><Image src="/images/logo.png" alt="Kulino Ngepit Logo" fill className="object-contain" /></div>
+            <div><strong className="font-display block text-sm font-black leading-none text-gray-900">Kulino Pit CMS</strong><span className="text-[9px] font-bold uppercase tracking-wider text-[var(--color-primary)]">Admin Portal</span></div>
+          </Link>
+          <button type="button" onClick={() => setIsSidebarOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-gray-700" aria-label="Buka menu admin"><Menu size={21} /></button>
+        </header>
+
+        {isSidebarOpen && <button type="button" className="fixed inset-0 z-30 bg-gray-900/45 backdrop-blur-sm md:hidden" onClick={() => setIsSidebarOpen(false)} aria-label="Tutup menu admin" />}
+
+        <div className="flex min-h-[calc(100vh-4rem)] md:min-h-screen">
         {/* Sidebar */}
-        <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-gray-100 flex-shrink-0 z-10 sticky top-0 md:h-screen overflow-y-auto">
-          <div className="p-6">
-            <Link href="/" className="flex items-center gap-3 group">
+        <aside className={`fixed inset-y-0 left-0 z-40 flex h-dvh w-[min(19rem,86vw)] flex-shrink-0 flex-col overflow-y-auto border-r border-gray-100 bg-white shadow-2xl transition-transform duration-300 md:sticky md:top-0 md:h-screen md:w-64 md:translate-x-0 md:shadow-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="flex items-center justify-between p-6">
+            <Link href="/" onClick={() => setIsSidebarOpen(false)} className="flex items-center gap-3 group">
               <div className="relative w-10 h-10 transition-transform group-hover:scale-105">
                 <Image 
                   src="/images/logo.png" 
@@ -90,6 +101,7 @@ export default function AdminLayout({ children }) {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)]">Admin Portal</span>
               </div>
             </Link>
+            <button type="button" onClick={() => setIsSidebarOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-500 md:hidden" aria-label="Tutup menu admin"><X size={18} /></button>
           </div>
           
           <nav className="p-4 space-y-2">
@@ -99,6 +111,7 @@ export default function AdminLayout({ children }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setIsSidebarOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all
                     ${isActive 
                       ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary)]' 
@@ -121,22 +134,24 @@ export default function AdminLayout({ children }) {
                 <p className="text-[10px] text-gray-500 font-semibold uppercase">Superadmin</p>
               </div>
             </div>
-            <button 
+            <button
+              type="button"
               onClick={handleLogout}
               className="flex items-center gap-2 justify-center w-full py-2.5 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
             >
               <LogOut size={16} /> Logout
             </button>
-            <Link href="/" className="mt-2 flex items-center gap-2 justify-center w-full py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">
+            <Link href="/" onClick={() => setIsSidebarOpen(false)} className="mt-2 flex items-center gap-2 justify-center w-full py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors">
               ← Back to Main Site
             </Link>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 md:p-8">
           {children}
         </main>
+        </div>
       </div>
     </I18nProvider>
   );
