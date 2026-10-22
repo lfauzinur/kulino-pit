@@ -57,12 +57,15 @@ export function ensureAppDatabase() {
           join_reason TEXT DEFAULT '',
           id_card TEXT DEFAULT '',
           photo_url TEXT DEFAULT '',
+          photo_public_id TEXT,
           status TEXT NOT NULL DEFAULT 'Pending',
           revenue INTEGER DEFAULT 0,
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `;
+
+      await sql`ALTER TABLE partner_applications ADD COLUMN IF NOT EXISTS photo_public_id TEXT`;
 
       await sql`
         CREATE TABLE IF NOT EXISTS articles (
@@ -159,6 +162,7 @@ export function partnerRow(row) {
     joinReason: row.join_reason,
     idCard: row.id_card,
     photoUrl: row.photo_url,
+    photoPublicId: row.photo_public_id,
     status: row.status,
     revenue: row.revenue,
     date: new Date(row.created_at).toISOString().slice(0, 10),

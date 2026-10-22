@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { Users, CheckCircle, XCircle, Clock, MessageCircle, Eye, X, Bike, Phone, MapPin, Calendar, Hash, Star, FileText, AlertCircle } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Users, CheckCircle, XCircle, Clock, MessageCircle, Eye, X, Bike, Phone, MapPin, Hash, FileText, AlertCircle, RefreshCcw } from 'lucide-react';
 
 export default function AdminPartnersPage() {
   const [partners, setPartners] = useState([]);
@@ -8,22 +8,35 @@ export default function AdminPartnersPage() {
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState('');
 
-  useEffect(() => {
-    fetch('/api/partners', { cache: 'no-store' })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Gagal memuat mitra.');
-        setPartners(data);
-      })
-      .catch((requestError) => setError(requestError.message))
-      .finally(() => setLoading(false));
+  const loadPartners = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/partners', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Gagal memuat mitra.');
+      setPartners(data);
+      setSelectedPartner((current) => current
+        ? data.find((partner) => partner.id === current.id) || null
+        : null);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    Promise.resolve().then(() => loadPartners());
+  }, [loadPartners]);
 
   const handleUpdateStatus = async (id, newStatus) => {
     setUpdatingId(id);
     setError('');
+    setSuccess('');
     try {
       const response = await fetch(`/api/partners/${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -34,6 +47,8 @@ export default function AdminPartnersPage() {
       if (!response.ok) throw new Error(updated.error || 'Status gagal diperbarui.');
       setPartners((current) => current.map((partner) => partner.id === id ? updated : partner));
       if (selectedPartner?.id === id) setSelectedPartner(updated);
+      setSuccess(`${updated.name} berhasil diubah menjadi ${newStatus}.`);
+      await loadPartners({ silent: true });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -79,14 +94,20 @@ export default function AdminPartnersPage() {
           <h1 className="font-display font-black text-3xl text-gray-900">Partner Applications</h1>
           <p className="text-sm text-gray-500 mt-1">Review and manage bike owner partnership requests.</p>
         </div>
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 text-xs font-semibold">
-            <Clock size={14} />
-            {pendingCount} application{pendingCount > 1 ? 's' : ''} pending review
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => loadPartners()} disabled={loading} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+          </button>
+          {pendingCount > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 text-xs font-semibold">
+              <Clock size={14} />
+              {pendingCount} application{pendingCount > 1 ? 's' : ''} pending review
+            </div>
+          )}
+        </div>
       </header>
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+      {success && <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">{success}</div>}
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-4">
@@ -112,6 +133,7 @@ export default function AdminPartnersPage() {
       <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
         {filters.map(f => (
           <button
+            type="button"
             key={f}
             onClick={() => setFilter(f)}
             className={`px-5 py-2.5 text-xs font-semibold rounded-full transition-all whitespace-nowrap
@@ -171,12 +193,13 @@ export default function AdminPartnersPage() {
                     <div className="flex items-center justify-end gap-2">
                       {p.status === 'Pending' && (
                         <>
-                          <button disabled={updatingId === p.id} onClick={() => handleUpdateStatus(p.id, 'Approved')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all disabled:opacity-50">Approve</button>
-                          <button disabled={updatingId === p.id} onClick={() => handleUpdateStatus(p.id, 'Rejected')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">Reject</button>
+                          <button type="button" disabled={updatingId === p.id} onClick={() => handleUpdateStatus(p.id, 'Approved')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all disabled:opacity-50">{updatingId === p.id ? 'Saving…' : 'Approve'}</button>
+                          <button type="button" disabled={updatingId === p.id} onClick={() => handleUpdateStatus(p.id, 'Rejected')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">Reject</button>
                         </>
                       )}
                       {/* View Detail */}
                       <button 
+                        type="button"
                         onClick={() => setSelectedPartner(p)}
                         className="p-2 rounded-lg text-gray-400 hover:text-[var(--color-primary)] hover:bg-blue-50 transition-colors" 
                         title="Lihat Detail Partner"
@@ -215,7 +238,7 @@ export default function AdminPartnersPage() {
             
             {/* Header */}
             <div className="bg-gradient-to-r from-[var(--color-primary)] to-sky-500 p-6 rounded-t-3xl relative">
-              <button onClick={() => setSelectedPartner(null)} className="absolute top-4 right-4 p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-colors text-white">
+              <button type="button" onClick={() => setSelectedPartner(null)} className="absolute top-4 right-4 p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-colors text-white">
                 <X size={18} />
               </button>
               <div className="flex items-center gap-4">
@@ -233,6 +256,12 @@ export default function AdminPartnersPage() {
             </div>
 
             <div className="p-6 space-y-5">
+              {selectedPartner.photoUrl && (
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2"><Eye size={12} /> Foto Sepeda</h3>
+                  <img src={selectedPartner.photoUrl} alt={`Sepeda ${selectedPartner.name}`} className="h-64 w-full rounded-2xl border border-gray-100 object-cover" />
+                </div>
+              )}
               {/* Profile Info */}
               <div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2"><Users size={12} /> Profil Pendaftar</h3>
@@ -308,12 +337,16 @@ export default function AdminPartnersPage() {
                 {selectedPartner.status === 'Pending' && (
                   <>
                     <button 
+                      type="button"
+                      disabled={updatingId === selectedPartner.id}
                       onClick={() => handleUpdateStatus(selectedPartner.id, 'Approved')}
-                      className="btn btn-primary flex-1 py-3"
+                      className="btn btn-primary flex-1 py-3 disabled:opacity-50"
                     >✓ Approve Partner</button>
                     <button 
+                      type="button"
+                      disabled={updatingId === selectedPartner.id}
                       onClick={() => handleUpdateStatus(selectedPartner.id, 'Rejected')}
-                      className="btn flex-1 py-3 border border-red-200 text-red-600 hover:bg-red-50"
+                      className="btn flex-1 py-3 border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >✕ Reject</button>
                   </>
                 )}

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '@/lib/data';
 import { CalendarDays, Search, Filter, ChevronDown, Settings, X, Save } from 'lucide-react';
 
@@ -8,7 +8,10 @@ export default function AdminBookingsPage() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState('');
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [summary, setSummary] = useState({ total: 0, pending: 0, active: 0, completed: 0, cancelled: 0, revenue: 0 });
   const filters = ['All', 'Pending', 'Active', 'Completed', 'Cancelled'];
   const [allBookings, setAllBookings] = useState([]);
   const filtered = allBookings.filter((booking) => {
@@ -19,16 +22,29 @@ export default function AdminBookingsPage() {
     return matchesFilter && matchesQuery;
   });
 
-  useEffect(() => {
-    fetch('/api/bookings', { cache: 'no-store' })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Gagal memuat booking.');
-        setAllBookings(data);
-      })
-      .catch((requestError) => setError(requestError.message))
-      .finally(() => setLoading(false));
+  const loadBookings = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    setError('');
+    try {
+      const [bookingsResponse, summaryResponse] = await Promise.all([
+        fetch('/api/bookings', { cache: 'no-store' }),
+        fetch('/api/bookings/summary', { cache: 'no-store' }),
+      ]);
+      const [bookingsData, summaryData] = await Promise.all([bookingsResponse.json(), summaryResponse.json()]);
+      if (!bookingsResponse.ok) throw new Error(bookingsData.error || 'Gagal memuat booking.');
+      if (!summaryResponse.ok) throw new Error(summaryData.error || 'Gagal memuat ringkasan booking.');
+      setAllBookings(bookingsData);
+      setSummary(summaryData);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    Promise.resolve().then(() => loadBookings());
+  }, [loadBookings]);
 
   // Payment Settings Modal
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
@@ -63,6 +79,7 @@ export default function AdminBookingsPage() {
   const handleUpdateStatus = async (id, newStatus) => {
     setUpdatingId(id);
     setError('');
+    setSuccess('');
     try {
       const response = await fetch(`/api/bookings/${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -72,6 +89,9 @@ export default function AdminBookingsPage() {
       const updated = await response.json();
       if (!response.ok) throw new Error(updated.error || 'Status gagal diperbarui.');
       setAllBookings((current) => current.map((booking) => booking.id === id ? updated : booking));
+      if (selectedBooking?.id === id) setSelectedBooking(updated);
+      setSuccess(`Booking ${id} berhasil diubah menjadi ${newStatus}.`);
+      await loadBookings({ silent: true });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -117,6 +137,7 @@ export default function AdminBookingsPage() {
       </header>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+      {success && <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">{success}</div>}
 
       {/* Payment Settings Modal */}
       {showPaymentSettings && (
@@ -201,14 +222,15 @@ export default function AdminBookingsPage() {
       {/* Stats Summary */}
       <div className="grid gap-4 sm:grid-cols-4">
         {[
-          { label: 'Total', count: allBookings.length, color: 'bg-gray-50' },
-          { label: 'Pending', count: allBookings.filter(b => b.status === 'Pending').length, color: 'bg-amber-50' },
-          { label: 'Active', count: allBookings.filter(b => b.status === 'Active').length, color: 'bg-blue-50' },
-          { label: 'Revenue', count: formatCurrency(allBookings.filter(b => b.status === 'Completed').reduce((a, b) => a + b.total, 0)), color: 'bg-green-50' },
+          { label: 'Total', count: summary.total, color: 'bg-gray-50' },
+          { label: 'Pending', count: summary.pending, color: 'bg-amber-50' },
+          { label: 'Active', count: summary.active, color: 'bg-blue-50' },
+          { label: 'Revenue', count: formatCurrency(summary.revenue), color: 'bg-green-50', sub: 'Active + Completed' },
         ].map((stat, i) => (
           <div key={i} className={`${stat.color} rounded-2xl p-4 border border-gray-100`}>
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{stat.label}</p>
             <p className="font-display font-black text-xl text-gray-900 mt-1">{stat.count}</p>
+            {stat.sub && <p className="mt-1 text-[9px] font-semibold text-green-700">{stat.sub}</p>}
           </div>
         ))}
       </div>
@@ -254,14 +276,14 @@ export default function AdminBookingsPage() {
                     <div className="flex items-center justify-end gap-2">
                       {b.status === 'Pending' && (
                         <>
-                          <button disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Active')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all disabled:opacity-50">Approve</button>
-                          <button disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Cancelled')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">Reject</button>
+                          <button type="button" disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Active')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)] transition-all disabled:opacity-50">Approve</button>
+                          <button type="button" disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Cancelled')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-all disabled:opacity-50">Reject</button>
                         </>
                       )}
                       {b.status === 'Active' && (
-                        <button disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Completed')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all disabled:opacity-50">Complete</button>
+                        <button type="button" disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Completed')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all disabled:opacity-50">Complete</button>
                       )}
-                      <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="View Details">
+                      <button type="button" onClick={() => setSelectedBooking(b)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="View Details">
                         👁️
                       </button>
                     </div>
@@ -279,6 +301,43 @@ export default function AdminBookingsPage() {
         )}
         {loading && <div className="py-12 text-center text-sm text-gray-500">Memuat booking dari database…</div>}
       </div>
+
+      {selectedBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Booking Detail</p>
+                <h2 className="font-display text-xl font-black text-gray-900">{selectedBooking.id}</h2>
+              </div>
+              <button type="button" onClick={() => setSelectedBooking(null)} className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200" aria-label="Tutup detail booking"><X size={16} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ['Customer', selectedBooking.user],
+                ['Telepon', selectedBooking.phone || '-'],
+                ['Email', selectedBooking.email || '-'],
+                ['Sepeda', selectedBooking.bike],
+                ['Tanggal', selectedBooking.date],
+                ['Waktu', selectedBooking.time || '-'],
+                ['Durasi', selectedBooking.duration || `${selectedBooking.days} hari`],
+                ['Metode Ambil', selectedBooking.pickupMethod === 'delivery' ? 'Delivery' : 'Pickup'],
+                ['Pembayaran', selectedBooking.paymentMethod || '-'],
+                ['Total', formatCurrency(selectedBooking.total)],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl bg-gray-50 p-3">
+                  <p className="text-[9px] font-bold uppercase text-gray-400">{label}</p>
+                  <p className="mt-1 text-xs font-semibold text-gray-800">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 flex items-center justify-between rounded-2xl border border-gray-100 p-4">
+              <span className="text-xs font-bold text-gray-500">Status saat ini</span>
+              <span className={`rounded-lg px-3 py-1 text-xs font-bold ${statusColor(selectedBooking.status)}`}>{selectedBooking.status}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

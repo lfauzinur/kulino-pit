@@ -8,8 +8,9 @@ const runtimeCachingWithoutApi = runtimeCaching.filter(
 
 const withPWA = withPWAInit({
   dest: 'public',
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  // Admin pages and their action handlers must always use the newest bundle.
+  cacheOnFrontEndNav: false,
+  aggressiveFrontEndNavCaching: false,
   reloadOnOnline: true,
   disable: process.env.NODE_ENV === 'development', // Disable PWA in development for better dev experience
   workboxOptions: {
