@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { resolveSocialMedia } from '@/lib/social-media';
 
 export const sql = neon(process.env.DATABASE_URL);
 
@@ -175,6 +176,41 @@ export function ensureAppDatabase() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `;
+      await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'upload'`;
+      await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS embed_url TEXT NOT NULL DEFAULT ''`;
+      await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS aspect_ratio TEXT NOT NULL DEFAULT '16 / 9'`;
+      const legacySocialItems = await sql`
+        SELECT id, media_url FROM gallery_items
+        WHERE media_type = 'video' AND provider = 'upload'
+          AND (media_url ILIKE '%youtube.com/%' OR media_url ILIKE '%youtu.be/%' OR media_url ILIKE '%instagram.com/%' OR media_url ILIKE '%tiktok.com/%')
+      `;
+      for (const item of legacySocialItems) {
+        const social = await resolveSocialMedia(item.media_url);
+        if (social) {
+          await sql`
+            UPDATE gallery_items SET provider = ${social.provider}, embed_url = ${social.embedUrl},
+              thumbnail_url = ${social.thumbnailUrl}, aspect_ratio = ${social.aspectRatio}, updated_at = NOW()
+            WHERE id = ${item.id}
+          `;
+        }
+      }
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS content_cards (
+          id BIGSERIAL PRIMARY KEY,
+          section_key TEXT NOT NULL,
+          title_id TEXT NOT NULL,
+          title_en TEXT NOT NULL DEFAULT '',
+          description_id TEXT NOT NULL DEFAULT '',
+          description_en TEXT NOT NULL DEFAULT '',
+          icon TEXT NOT NULL DEFAULT 'users',
+          accent_color TEXT NOT NULL DEFAULT '#3B82F6',
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          published BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
 
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_categories_name_lower_idx ON tour_categories (LOWER(name))`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_name_lower_idx ON tour_packages (LOWER(name))`;
@@ -235,6 +271,26 @@ export function ensureAppDatabase() {
         ON CONFLICT DO NOTHING
       `;
 
+      await sql`
+        INSERT INTO content_cards (section_key, title_id, title_en, description_id, description_en, icon, accent_color, sort_order)
+        SELECT seed.* FROM (VALUES
+          ('corporate_benefits', 'Team Building', 'Team Building', 'Perkuat solidaritas tim melalui aktivitas bersepeda bersama', 'Strengthen team solidarity through cycling activities', 'users', '#2563EB', 10),
+          ('corporate_benefits', 'Dokumentasi', 'Documentation', 'Foto & video profesional untuk kenangan dan media perusahaan', 'Professional photos and videos for company memories and media', 'camera', '#F59E0B', 20),
+          ('corporate_benefits', 'Prestise', 'Prestige', 'Kegiatan yang berkesan dan berbeda dari team building konvensional', 'A memorable activity beyond conventional team building', 'award', '#8B5CF6', 30),
+          ('corporate_benefits', 'Ramah Lingkungan', 'Eco Friendly', 'Tunjukkan komitmen perusahaan terhadap lingkungan', 'Show your company commitment to the environment', 'leaf', '#10B981', 40),
+          ('manpower_roles', 'Road Captain (RC)', 'Road Captain (RC)', 'Pemimpin rute dan keselamatan peserta', 'Route leader responsible for participant safety', 'flag', '#F59E0B', 10),
+          ('manpower_roles', 'Marshal / Sweeper', 'Marshal / Sweeper', 'Pengawal di persimpangan dan pendampingan', 'Intersection marshal and participant escort', 'shield-check', '#EF4444', 20),
+          ('manpower_roles', 'MC Event Cycling', 'Cycling Event MC', 'Pembawa acara event bersepeda', 'Cycling event host', 'mic', '#8B5CF6', 30),
+          ('manpower_roles', 'Mekanik / Teknisi', 'Mechanic / Technician', 'Penanganan masalah teknis sepeda', 'Bicycle technical support', 'wrench', '#3B82F6', 40),
+          ('manpower_roles', 'Tim Medis & First Aid', 'Medical & First Aid Team', 'Penanganan pertolongan pertama', 'First aid and medical response', 'heart-pulse', '#10B981', 50),
+          ('manpower_roles', 'Patwal / Pengawalan', 'Police Escort', 'Pengawalan rombongan di jalan raya', 'Road escort for cycling groups', 'siren', '#06B6D4', 60)
+        ) AS seed(section_key, title_id, title_en, description_id, description_en, icon, accent_color, sort_order)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM content_cards
+          WHERE content_cards.section_key = seed.section_key AND LOWER(content_cards.title_id) = LOWER(seed.title_id)
+        )
+      `;
+
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS partner_status_idx ON partner_applications (status)`;
@@ -247,6 +303,8 @@ export function ensureAppDatabase() {
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS gallery_items_media_url_idx ON gallery_items (media_url)`;
       await sql`CREATE INDEX IF NOT EXISTS services_sort_idx ON services (published, sort_order, id)`;
       await sql`CREATE INDEX IF NOT EXISTS gallery_items_sort_idx ON gallery_items (published, sort_order, id)`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS content_cards_section_title_idx ON content_cards (section_key, LOWER(title_id))`;
+      await sql`CREATE INDEX IF NOT EXISTS content_cards_sort_idx ON content_cards (section_key, published, sort_order, id)`;
     })().catch((error) => {
       schemaPromise = undefined;
       throw error;
@@ -414,10 +472,26 @@ export function galleryRow(row) {
     title: row.title,
     type: row.media_type,
     mediaUrl: row.media_url,
+    provider: row.provider || 'upload',
+    embedUrl: row.embed_url || '',
+    aspectRatio: row.aspect_ratio || '16 / 9',
     mediaPublicId: row.media_public_id,
     thumbnailUrl: row.thumbnail_url || row.media_url,
     thumbnailPublicId: row.thumbnail_public_id,
     caption: row.caption,
+    sortOrder: Number(row.sort_order),
+    published: Boolean(row.published),
+  };
+}
+
+export function contentCardRow(row) {
+  return {
+    id: Number(row.id),
+    section: row.section_key,
+    title: { id: row.title_id, en: row.title_en || row.title_id },
+    description: { id: row.description_id, en: row.description_en || row.description_id },
+    icon: row.icon,
+    accentColor: row.accent_color,
     sortOrder: Number(row.sort_order),
     published: Boolean(row.published),
   };

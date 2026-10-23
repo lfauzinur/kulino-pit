@@ -18,11 +18,11 @@ const accIcons = {
   repairkit: <Wrench size={18} className="text-[var(--color-primary)]" />
 };
 
-export default function InAppBookingModal({ bike, member, onClose, onSuccess }) {
-  const [rentalType, setRentalType] = useState('2h');
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+export default function InAppBookingModal({ bike, member, initialDraft, onClose, onChangeBike, onSuccess }) {
+  const [rentalType, setRentalType] = useState(initialDraft?.rentalType || '2h');
+  const [selectedDate, setSelectedDate] = useState(() => initialDraft?.dates?.start || new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('06:30');
-  const [pickupMethod, setPickupMethod] = useState('pickup');
+  const [pickupMethod, setPickupMethod] = useState(initialDraft?.pickupMethod || 'pickup');
   const [selectedAccessories, setSelectedAccessories] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('QRIS');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -91,6 +91,7 @@ export default function InAppBookingModal({ bike, member, onClose, onSuccess }) 
       localStorage.setItem('memberBookings', JSON.stringify([memberBooking, ...existing]));
       setBookingResult({ ...newBooking, uniqueCode, subtotal });
       setIsSubmitted(true);
+      sessionStorage.removeItem('kulinoBookingDraft');
       if (onSuccess) onSuccess(memberBooking);
     } catch (requestError) {
       setSubmitError(requestError.message);
@@ -119,12 +120,16 @@ export default function InAppBookingModal({ bike, member, onClose, onSuccess }) 
               {isSubmitted ? 'Konfirmasi Booking Selesai' : 'Pemesanan Sewa Sepeda Member PWA'}
             </h3>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {!isSubmitted && onChangeBike && <button type="button" onClick={onChangeBike} className="rounded-full bg-white/10 px-3 py-2 text-[10px] font-bold text-sky-100 hover:bg-white/20">Ganti unit</button>}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-colors"
+              aria-label="Tutup pemesanan"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Modal Scrollable Body */}

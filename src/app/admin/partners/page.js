@@ -11,6 +11,14 @@ export default function AdminPartnersPage() {
   const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState('');
 
+  useEffect(() => {
+    if (!selectedPartner) return undefined;
+    const closeOnEscape = (event) => { if (event.key === 'Escape') setSelectedPartner(null); };
+    document.addEventListener('keydown', closeOnEscape);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', closeOnEscape); document.body.style.overflow = ''; };
+  }, [selectedPartner]);
+
   const loadPartners = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     setError('');
@@ -233,12 +241,12 @@ export default function AdminPartnersPage() {
 
       {/* ─── Partner Detail Modal ─── */}
       {selectedPartner && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedPartner(null)}>
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-2 backdrop-blur-sm animate-fade-in sm:p-4" onClick={() => setSelectedPartner(null)}>
+          <div className="relative my-auto max-h-[calc(100dvh-1rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]" onClick={e => e.stopPropagation()}>
             
             {/* Header */}
-            <div className="bg-gradient-to-r from-[var(--color-primary)] to-sky-500 p-6 rounded-t-3xl relative">
-              <button type="button" onClick={() => setSelectedPartner(null)} className="absolute top-4 right-4 p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-colors text-white">
+            <div className="sticky top-0 z-20 bg-gradient-to-r from-[var(--color-primary)] to-sky-500 p-6 rounded-t-3xl relative">
+              <button type="button" onClick={() => setSelectedPartner(null)} className="absolute top-4 right-4 grid h-11 w-11 place-items-center rounded-xl bg-white text-gray-700 shadow-lg transition-colors hover:bg-red-50 hover:text-red-600" aria-label="Tutup detail mitra">
                 <X size={18} />
               </button>
               <div className="flex items-center gap-4">

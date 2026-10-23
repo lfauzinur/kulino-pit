@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 import { bikes as initialBikes, accessories, formatCurrency, rentalDurations, getLowestPrice, getPriceByDuration } from '@/lib/data';
@@ -359,6 +360,7 @@ function Step4({ selectedBike, rentalType, dates, pickupMethod, selectedAccessor
 /* ─── Main Booking Page ─── */
 export default function BookingPage() {
   const { t, locale } = useI18n();
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [selectedBike, setSelectedBike] = useState(null);
   const [rentalType, setRentalType] = useState('2h');
@@ -394,6 +396,27 @@ export default function BookingPage() {
 
   const toggleAccessory = (id) => {
     setSelectedAccessories(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const chooseBike = (bike) => {
+    setSelectedBike(bike);
+    setRequestedBike(bike);
+    const url = new URL(window.location.href);
+    url.searchParams.set('bikeId', bike.id);
+    window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+  };
+
+  const handleNext = () => {
+    if (!canNext()) return;
+    if (step !== 1) { setStep((current) => current + 1); return; }
+    const draft = { bikeId: selectedBike.id, rentalType, dates, pickupMethod };
+    sessionStorage.setItem('kulinoBookingDraft', JSON.stringify(draft));
+    const memberTarget = `/member?bookBike=${selectedBike.id}&resume=1`;
+    if (localStorage.getItem('isMember') === 'true') {
+      router.push(memberTarget);
+    } else {
+      router.push(`/register?bookBike=${selectedBike.id}&redirect=${encodeURIComponent('/member')}`);
+    }
   };
 
   const canNext = () => {
@@ -568,7 +591,7 @@ export default function BookingPage() {
         <StepIndicator current={step} steps={steps} />
 
         <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-100 relative">
-          {step === 0 && <Step1 bikesList={bikesList} selected={selectedBike} onSelect={setSelectedBike} locale={locale} t={t} requestedBike={requestedBike} />}
+          {step === 0 && <Step1 bikesList={bikesList} selected={selectedBike} onSelect={chooseBike} locale={locale} t={t} requestedBike={requestedBike} />}
           {step === 1 && <Step2 selectedBike={selectedBike} rentalType={rentalType} setRentalType={setRentalType} dates={dates} setDates={setDates} pickupMethod={pickupMethod} setPickupMethod={setPickupMethod} t={t} locale={locale} />}
           {step === 2 && <Step3 selectedAccessories={selectedAccessories} toggleAccessory={toggleAccessory} setSelectedAccessories={setSelectedAccessories} locale={locale} t={t} />}
           {step === 3 && <Step4 selectedBike={selectedBike} rentalType={rentalType} dates={dates} pickupMethod={pickupMethod} selectedAccessories={selectedAccessories} customerInfo={customerInfo} setCustomerInfo={setCustomerInfo} t={t} locale={locale} />}
@@ -580,9 +603,9 @@ export default function BookingPage() {
               <button onClick={() => setStep(s => s - 1)} className="px-6 py-3 rounded-xl font-semibold text-sm bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors">← {t('booking.prev')}</button>
             ) : <div />}
             {step < 3 ? (
-              <button onClick={() => canNext() && setStep(s => s + 1)} disabled={!canNext()} className={`px-8 py-3 rounded-xl font-semibold text-sm transition-all shadow-sm
+              <button onClick={handleNext} disabled={!canNext()} className={`px-8 py-3 rounded-xl font-semibold text-sm transition-all shadow-sm
                 ${canNext() ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-light)]' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
-                {t('booking.next')} →
+                {step === 1 ? 'Selesaikan di Dashboard Member →' : `${t('booking.next')} →`}
               </button>
             ) : (
               <button disabled={submitting || !canNext()} onClick={handleSubmit} className="px-8 py-3 rounded-xl font-semibold text-sm bg-[var(--color-primary)] text-white shadow-md hover:bg-[var(--color-primary-light)] transition-all flex items-center gap-2 disabled:opacity-50">

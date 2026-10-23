@@ -7,24 +7,21 @@ import { Camera, Truck, Users, Flag, ShieldCheck, Mic, Wrench, HeartPulse, Siren
 export default function LayananPage() {
   const { t, locale } = useI18n();
   const [mainServices, setMainServices] = useState([]);
+  const [manpowerRoles, setManpowerRoles] = useState([]);
 
   useEffect(() => {
     fetch('/api/services', { cache: 'no-store' })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
       .then(setMainServices)
       .catch(() => setMainServices([]));
+    fetch('/api/content-cards?section=manpower_roles', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(setManpowerRoles)
+      .catch(() => setManpowerRoles([]));
   }, []);
 
   const serviceIcons = { camera: Camera, truck: Truck, users: Users };
-
-  const manpowerRoles = [
-    { role: t('services.items.roadCaptain.name'), icon: <Flag size={22} />, desc: t('services.items.roadCaptain.desc'), color: '#F59E0B' },
-    { role: t('services.items.marshal.name'), icon: <ShieldCheck size={22} />, desc: t('services.items.marshal.desc'), color: '#EF4444' },
-    { role: t('services.items.mc.name'), icon: <Mic size={22} />, desc: t('services.items.mc.desc'), color: '#8B5CF6' },
-    { role: t('services.items.mechanic.name'), icon: <Wrench size={22} />, desc: t('services.items.mechanic.desc'), color: '#3B82F6' },
-    { role: t('services.items.medic.name'), icon: <HeartPulse size={22} />, desc: t('services.items.medic.desc'), color: '#10B981' },
-    { role: t('services.items.escort.name'), icon: <Siren size={22} />, desc: t('services.items.escort.desc'), color: '#06B6D4' },
-  ];
+  const roleIcons = { flag: Flag, 'shield-check': ShieldCheck, mic: Mic, wrench: Wrench, 'heart-pulse': HeartPulse, siren: Siren, users: Users };
 
   return (
     <div className="py-12">
@@ -70,17 +67,17 @@ export default function LayananPage() {
             <p className="text-sm text-gray-500 mt-2">Tim profesional kami siap mendukung setiap event bersepeda Anda</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {manpowerRoles.map((role, i) => (
-              <div key={i} className="bg-white rounded-2xl p-5 border border-[var(--color-primary)]/10 hover:shadow-md hover:-translate-y-0.5 transition-all">
+            {manpowerRoles.map((role) => { const RoleIcon = roleIcons[role.icon] || Users; return (
+              <div key={role.id} className="bg-white rounded-2xl p-5 border border-[var(--color-primary)]/10 hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: role.color + '15', color: role.color }}>
-                    {role.icon}
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: role.accentColor + '15', color: role.accentColor }}>
+                    <RoleIcon size={22} />
                   </div>
-                  <h3 className="font-display font-black text-sm text-gray-900">{role.role}</h3>
+                  <h3 className="font-display font-black text-sm text-gray-900">{role.title[locale] || role.title.id}</h3>
                 </div>
-                <p className="text-xs text-gray-500 leading-5">{role.desc}</p>
+                <p className="text-xs text-gray-500 leading-5">{role.description[locale] || role.description.id}</p>
               </div>
-            ))}
+            );})}
           </div>
           <div className="text-center mt-8">
             <a href="https://wa.me/6281234567890" className="btn btn-primary px-8 py-4 text-sm inline-flex items-center gap-2 shadow-md">

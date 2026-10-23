@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { ensureAppDatabase, galleryRow, sql } from '@/lib/app-database';
+import { resolveSocialMedia } from '@/lib/social-media';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -29,11 +30,16 @@ export async function POST(request) {
     const mediaUrl = String(body.mediaUrl || '').trim();
     const type = body.type === 'video' ? 'video' : 'photo';
     if (!title || !mediaUrl) return NextResponse.json({ error: 'Judul dan file media wajib diisi.' }, { status: 400, headers: noStore });
+    const social = type === 'video' ? await resolveSocialMedia(mediaUrl) : null;
+    const provider = social?.provider || 'upload';
+    const embedUrl = social?.embedUrl || '';
+    const aspectRatio = social?.aspectRatio || String(body.aspectRatio || (type === 'photo' ? '4 / 3' : '16 / 9'));
+    const thumbnailUrl = social?.thumbnailUrl || String(body.thumbnailUrl || (type === 'photo' ? mediaUrl : ''));
     const rows = await sql`
-      INSERT INTO gallery_items (title, media_type, media_url, media_public_id, thumbnail_url, thumbnail_public_id, caption, sort_order, published)
-      VALUES (${title}, ${type}, ${mediaUrl}, ${body.mediaPublicId || null}, ${String(body.thumbnailUrl || mediaUrl)},
+      INSERT INTO gallery_items (title, media_type, media_url, media_public_id, thumbnail_url, thumbnail_public_id, caption, sort_order, published, provider, embed_url, aspect_ratio)
+      VALUES (${title}, ${type}, ${social?.sourceUrl || mediaUrl}, ${body.mediaPublicId || null}, ${thumbnailUrl},
         ${body.thumbnailPublicId || null}, ${String(body.caption || '').trim()},
-        ${Number.isFinite(Number(body.sortOrder)) ? Math.round(Number(body.sortOrder)) : 0}, ${body.published !== false})
+        ${Number.isFinite(Number(body.sortOrder)) ? Math.round(Number(body.sortOrder)) : 0}, ${body.published !== false}, ${provider}, ${embedUrl}, ${aspectRatio})
       RETURNING *
     `;
     return NextResponse.json(galleryRow(rows[0]), { status: 201, headers: noStore });

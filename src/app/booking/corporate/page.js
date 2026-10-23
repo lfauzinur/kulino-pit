@@ -1,6 +1,7 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Building2, Phone, Calendar, CheckCircle, ChevronLeft, Star, Users, Bike } from 'lucide-react';
+import { Award, Building2, Phone, Calendar, Camera, CheckCircle, ChevronLeft, Leaf, Star, Users, Bike } from 'lucide-react';
 
 const packages = [
   {
@@ -35,14 +36,11 @@ const packages = [
   },
 ];
 
-const benefits = [
-  { icon: '🤝', title: 'Team Building', desc: 'Perkuat solidaritas tim melalui aktivitas bersepeda bersama' },
-  { icon: '📸', title: 'Dokumentasi', desc: 'Foto & video profesional untuk kenangan dan media perusahaan' },
-  { icon: '🏆', title: 'Prestise', desc: 'Kegiatan yang berkesan dan berbeda dari team building konvensional' },
-  { icon: '🌿', title: 'Ramah Lingkungan', desc: 'Tunjukkan komitmen perusahaan terhadap lingkungan' },
-];
+const benefitIcons = { users: Users, camera: Camera, award: Award, leaf: Leaf };
 
 export default function CorporateBookingPage() {
+  const [benefits, setBenefits] = useState([]);
+  useEffect(() => { fetch('/api/content-cards?section=corporate_benefits', { cache: 'no-store' }).then((response) => response.ok ? response.json() : []).then(setBenefits).catch(() => setBenefits([])); }, []);
   return (
     <div className="pt-24 pb-20 min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,13 +64,13 @@ export default function CorporateBookingPage() {
 
         {/* Benefits */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-          {benefits.map((b, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 text-center shadow-sm">
-              <span className="text-3xl mb-3 block">{b.icon}</span>
-              <h3 className="font-bold text-sm text-gray-900 mb-1">{b.title}</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">{b.desc}</p>
+          {benefits.map((b) => { const Icon = benefitIcons[b.icon] || Users; return (
+            <div key={b.id} className="bg-white rounded-2xl p-5 border border-gray-100 text-center shadow-sm">
+              <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl" style={{ backgroundColor: `${b.accentColor}18`, color: b.accentColor }}><Icon size={24} /></span>
+              <h3 className="font-bold text-sm text-gray-900 mb-1">{b.title.id}</h3>
+              <p className="text-xs text-gray-500 leading-relaxed">{b.description.id}</p>
             </div>
-          ))}
+          );})}
         </div>
 
         {/* Packages */}

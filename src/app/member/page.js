@@ -2339,6 +2339,7 @@ export default function MemberPage() {
   
   // In-App Booking State (Gambar 4 & 5)
   const [selectedBookingBike, setSelectedBookingBike] = useState(null);
+  const [bookingDraft, setBookingDraft] = useState(null);
   const [showBikeCatalogModal, setShowBikeCatalogModal] = useState(false);
   const [history, setHistory] = useState(memberData.bookingHistory);
 
@@ -2377,12 +2378,19 @@ export default function MemberPage() {
       const params = new URLSearchParams(window.location.search);
       const bookBikeId = params.get('bookBike');
       if (bookBikeId) {
-        const targetBike = bikes.find(b => String(b.id) === String(bookBikeId));
-        if (targetBike) {
-          setTimeout(() => {
-            setSelectedBookingBike(targetBike);
-          }, 500);
-        }
+        let savedDraft = null;
+        try { savedDraft = JSON.parse(sessionStorage.getItem('kulinoBookingDraft') || 'null'); } catch { savedDraft = null; }
+        setBookingDraft(savedDraft);
+        fetch('/api/bikes', { cache: 'no-store' })
+          .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+          .then((list) => {
+            const targetBike = list.find((bike) => String(bike.id) === String(bookBikeId));
+            if (targetBike?.available) setSelectedBookingBike(targetBike);
+          })
+          .catch(() => {
+            const targetBike = bikes.find(b => String(b.id) === String(bookBikeId));
+            if (targetBike) setSelectedBookingBike(targetBike);
+          });
         // Clean the URL without reload
         window.history.replaceState({}, '', '/member');
       }
@@ -2544,7 +2552,9 @@ export default function MemberPage() {
         <InAppBookingModal
           bike={selectedBookingBike}
           member={memberProfile}
+          initialDraft={bookingDraft}
           onClose={() => setSelectedBookingBike(null)}
+          onChangeBike={() => { setSelectedBookingBike(null); setShowBikeCatalogModal(true); }}
           onSuccess={handleBookingSuccess}
         />
       )}
