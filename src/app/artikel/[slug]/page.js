@@ -4,27 +4,29 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Calendar, User, Share2, Link2, MessageCircle } from 'lucide-react';
-import { articles } from '@/lib/data';
 import { useI18n } from '@/lib/i18n';
 
 export default function ArticleDetail() {
   const { locale } = useI18n();
   const { slug } = useParams();
-  const [allArticles, setAllArticles] = useState(articles);
+  const [allArticles, setAllArticles] = useState([]);
   const [article, setArticle] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/articles', { cache: 'no-store' })
       .then((response) => response.ok ? response.json() : [])
       .then((custom) => {
-        const merged = [...custom, ...articles];
-        setAllArticles(merged);
-        setArticle(merged.find((item) => String(item.id) === String(slug)) || merged[0]);
+        const databaseArticles = Array.isArray(custom) ? custom : [];
+        setAllArticles(databaseArticles);
+        setArticle(databaseArticles.find((item) => String(item.id) === String(slug)) || null);
       })
-      .catch(() => setArticle(articles.find((item) => String(item.id) === String(slug)) || articles[0]));
+      .catch(() => setArticle(null))
+      .finally(() => setLoading(false));
   }, [slug]);
 
-  if (!article) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (!article) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><p className="font-bold text-gray-700">Artikel tidak ditemukan.</p><Link href="/artikel" className="text-[var(--color-primary)] font-semibold">Kembali ke daftar artikel</Link></div>;
 
   return (
     <div className="bg-gray-50 min-h-screen pt-24 pb-16">
@@ -86,51 +88,11 @@ export default function ArticleDetail() {
                 <img src={block.url} alt={block.caption || article.title[locale] || article.title.id} className="w-full rounded-2xl" />
                 {block.caption && <figcaption className="mt-2 text-center text-sm text-gray-500">{block.caption}</figcaption>}
               </figure>
-            ) : null) : <>
-            <p className="first-letter:text-7xl first-letter:font-black first-letter:text-[var(--color-primary)] first-letter:mr-3 first-letter:float-left">
-              {locale === 'id' 
-                ? 'Banyuwangi selalu menyimpan pesona alam yang tak pernah ada habisnya untuk dieksplorasi. Bagi para pecinta olahraga bersepeda, wilayah ini adalah surga dunia yang menawarkan perpaduan sempurna antara kontur pegunungan yang menantang dan garis pantai yang eksotis.' 
-                : 'Banyuwangi always holds natural charms that are never-ending to explore. For cycling enthusiasts, this region is a paradise that offers a perfect blend of challenging mountain contours and exotic coastlines.'}
-            </p>
-            <p>
-              {locale === 'id' 
-                ? 'Dalam artikel ini, kita akan membedah secara mendalam mengapa rute-rute di Banyuwangi sangat direkomendasikan baik untuk pemula maupun pesepeda profesional. Mulai dari tanjakan legendaris Ijen hingga jalan santai melintasi hutan de Djawatan.' 
-                : 'In this article, we will deeply dissect why the routes in Banyuwangi are highly recommended for both beginners and professional cyclists. From the legendary Ijen climb to a relaxing ride through the de Djawatan forest.'}
-            </p>
-            <h3 className="font-display font-black text-2xl text-gray-900 mt-10 mb-4">
-              {locale === 'id' ? 'Mempersiapkan Fisik dan Sepeda' : 'Preparing Physically and Your Bike'}
-            </h3>
-            <p>
-              {locale === 'id' 
-                ? 'Sebelum menaklukkan rute-rute ini, ada beberapa persiapan esensial yang pantang untuk dilewatkan. Kondisi fisik harus prima, mengingat beberapa rute memiliki elevasi yang tidak main-main. Pastikan Anda telah melakukan pemanasan yang cukup dan sarapan dengan gizi seimbang.' 
-                : 'Before conquering these routes, there are some essential preparations that must not be missed. Your physical condition must be prime, considering some routes have serious elevations. Ensure you have warmed up enough and had a balanced breakfast.'}
-            </p>
-            <div className="my-8 p-6 bg-blue-50 border-l-4 border-[var(--color-primary)] rounded-r-xl">
-              <p className="font-bold text-[var(--color-primary-dark)] m-0 flex items-center gap-2">
-                <span className="text-xl">💡</span> {locale === 'id' ? 'Tips Pro dari Kulino Pit:' : 'Pro Tip from Kulino Pit:'}
-              </p>
-              <p className="text-[var(--color-primary-dark)] m-0 mt-2 text-sm leading-relaxed">
-                {locale === 'id' 
-                  ? 'Selalu bawa cadangan ban dalam dan pompa mini. Jangan ragu menyewa unit sepeda Gravel atau MTB di Kulino Pit jika Anda berniat masuk ke rute off-road. Sepeda kami selalu dalam kondisi prima dan siap tempur.' 
-                  : 'Always carry a spare inner tube and mini pump. Don\'t hesitate to rent a Gravel or MTB bike at Kulino Pit if you plan to hit the off-road routes. Our bikes are always in prime condition and ready for battle.'}
-              </p>
-            </div>
-
-            <p>
-              {locale === 'id' 
-                ? 'Selain fisik, perlengkapan safety seperti helm, kacamata UV, dan lampu sepeda wajib terpasang. Banyuwangi terkadang memiliki cuaca yang mudah berubah di daerah dataran tinggi.' 
-                : 'Besides physical readiness, safety gear like helmets, UV glasses, and bike lights must be installed. Banyuwangi sometimes has unpredictable weather in highland areas.'}
-            </p>
-
-            <h3 className="font-display font-black text-2xl text-gray-900 mt-10 mb-4">
-              {locale === 'id' ? 'Menikmati Setiap Kayuhan' : 'Enjoying Every Pedal'}
-            </h3>
-            <p>
-              {locale === 'id' 
-                ? 'Perjalanan bukanlah tentang seberapa cepat Anda sampai di garis akhir, melainkan tentang pengalaman di sepanjang jalan. Nikmati udaranya, sapalah warga lokal yang ramah, dan jangan lupa berhenti sejenak untuk mengabadikan momen di titik-titik pemandangan terbaik.' 
-                : 'The journey is not about how fast you reach the finish line, but the experience along the way. Enjoy the air, greet the friendly locals, and don\'t forget to pause to capture moments at the best scenic spots.'}
-            </p>
-            </>}
+            ) : null) : (
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-500">
+                {locale === 'id' ? 'Konten lengkap artikel belum ditambahkan.' : 'The full article content has not been added yet.'}
+              </div>
+            )}
           </div>
 
           {/* Sidebar / Share */}

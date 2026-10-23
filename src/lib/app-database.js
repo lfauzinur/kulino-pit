@@ -261,15 +261,23 @@ export function ensureAppDatabase() {
         ON CONFLICT DO NOTHING
       `;
 
+      // These three records were initial UI demos. Older builds re-created them on
+      // every request after an admin deleted them. Clean them once and never seed
+      // them again so an admin deletion remains permanent.
       await sql`
-        INSERT INTO gallery_items (title, media_type, media_url, thumbnail_url, caption, sort_order)
-        SELECT seed.* FROM (VALUES
-          ('Sunrise Ride Banyuwangi', 'photo', '/images/hero-banner.png', '/images/hero-banner.png', 'Gowes pagi menikmati panorama Banyuwangi.', 10),
-          ('Koleksi Sepeda Kulino Pit', 'photo', '/images/tour_gallery_1.png', '/images/tour_gallery_1.png', 'Unit pilihan untuk berbagai medan dan kebutuhan.', 20),
-          ('Kulino Pit Ride Highlight', 'video', '/videos/kulino-pit-highlight.mp4', '/images/hero-banner.png', 'Cuplikan perjalanan, unit, dan suasana gowes bersama Kulino Pit.', 30)
-        ) AS seed(title, media_type, media_url, thumbnail_url, caption, sort_order)
-        WHERE NOT EXISTS (SELECT 1 FROM gallery_items WHERE gallery_items.media_url = seed.media_url)
-        ON CONFLICT DO NOTHING
+        WITH cleanup_marker AS (
+          INSERT INTO app_settings (key, value)
+          VALUES ('cleanup_demo_gallery_v1', '{"completed":true}'::jsonb)
+          ON CONFLICT (key) DO NOTHING
+          RETURNING key
+        )
+        DELETE FROM gallery_items
+        WHERE EXISTS (SELECT 1 FROM cleanup_marker)
+          AND (
+            (title = 'Sunrise Ride Banyuwangi' AND media_url = '/images/hero-banner.png')
+            OR (title = 'Koleksi Sepeda Kulino Pit' AND media_url = '/images/tour_gallery_1.png')
+            OR (title = 'Kulino Pit Ride Highlight' AND media_url = '/videos/kulino-pit-highlight.mp4')
+          )
       `;
 
       await sql`

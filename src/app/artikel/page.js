@@ -3,18 +3,19 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useI18n } from '@/lib/i18n';
-import { articles } from '@/lib/data';
 import { Clock, Tag, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function ArtikelPage() {
   const { locale } = useI18n();
-  const [allArticles, setAllArticles] = useState(articles);
+  const [allArticles, setAllArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/articles', { cache: 'no-store' })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Failed to load articles')))
-      .then((custom) => setAllArticles([...custom, ...articles]))
-      .catch(console.error);
+      .then((custom) => setAllArticles(Array.isArray(custom) ? custom : []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -37,6 +38,11 @@ export default function ArtikelPage() {
         </div>
 
         {/* Featured Article */}
+        {!loading && allArticles.length === 0 && (
+          <div className="clean-card p-12 text-center text-sm text-gray-500">
+            Belum ada artikel yang dipublikasikan.
+          </div>
+        )}
         {allArticles.length > 0 && (
           <article className="clean-card overflow-hidden mb-12 grid lg:grid-cols-2 group hover:shadow-[var(--shadow-medium)] transition-shadow">
             <div className="relative aspect-video lg:aspect-auto overflow-hidden">

@@ -1,11 +1,12 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
-import { memberData, calendarBookings, bikes, tours, articles, formatCurrency, getLowestPrice } from '@/lib/data';
+import { bikes, tours, formatCurrency, getLowestPrice } from '@/lib/data';
+import { memberRewards, normalizeMemberProfile } from '@/lib/member-profile';
 import PWAInstallBanner from '@/components/PWAInstallBanner';
 import CyclingWeatherCard from '@/components/CyclingWeatherCard';
 import InAppBookingModal from '@/components/InAppBookingModal';
@@ -129,7 +130,7 @@ function DigitalMemberCard({ user, onShowQR }) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1 shadow-sm backdrop-blur-sm">
-              <Star size={10} fill="currentColor" /> {user.level || 'GOLD'} VIP
+              <Star size={10} fill="currentColor" /> {user.level || 'Member'}
             </span>
             <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">
               KULINO PIT CLUB
@@ -143,7 +144,7 @@ function DigitalMemberCard({ user, onShowQR }) {
         <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1 rounded-xl border border-white/15">
           <Sparkles size={13} className="text-amber-300" />
           <span className="font-mono text-xs font-bold text-white tracking-wider">
-            {user.points?.toLocaleString() || '1.250'} <span className="text-[9px] text-white/60">PTS</span>
+            {(user.points || 0).toLocaleString()} <span className="text-[9px] text-white/60">PTS</span>
           </span>
         </div>
       </div>
@@ -153,11 +154,11 @@ function DigitalMemberCard({ user, onShowQR }) {
         <div>
           <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest mb-0.5">NAMA ANGGOTA</p>
           <p className="font-display font-bold text-base sm:text-lg text-white leading-tight mb-2">
-            {user.name || 'Andi Pratama'}
+            {user.name || 'Member Kulino Pit'}
           </p>
           <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest mb-0.5">ID MEMBER</p>
           <p className="font-mono font-bold text-xs tracking-widest text-sky-200">
-            {user.memberId || 'KP-2026-0089'}
+            {user.memberId || '-'}
           </p>
         </div>
 
@@ -177,8 +178,8 @@ function DigitalMemberCard({ user, onShowQR }) {
 }
 
 /* ─── Dashboard Overview Tab (Harmonious Theme & In-App Booking) ─── */
-function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBikeCatalog, history }) {
-  const d = memberData;
+function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBikeCatalog, history, member }) {
+  const d = member;
   const [showQRModal, setShowQRModal] = useState(false);
 
   const promos = [
@@ -319,7 +320,7 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
               <Star size={18} className="text-[var(--color-primary)]" />
             </div>
             <p className="font-display font-black text-base text-gray-900 leading-none flex items-center gap-1">
-              {d.level} <span className="text-[10px] text-[var(--color-primary)] font-bold">⭐⭐⭐</span>
+              {d.level}
             </p>
           </div>
         </div>
@@ -560,6 +561,11 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
         </div>
 
         <div className="divide-y divide-gray-100">
+          {history.length === 0 && (
+            <div className="py-8 text-center text-xs font-medium text-gray-400">
+              Belum ada transaksi booking pada akun ini.
+            </div>
+          )}
           {history.slice(0, 4).map((b) => (
             <div key={b.id} className="py-3 flex items-center justify-between gap-3 hover:bg-gray-50/50 rounded-xl px-2 transition-colors">
               <div className="flex items-center gap-3 min-w-0">
@@ -1224,7 +1230,7 @@ function RideTrackerTab({ t, locale }) {
 }
 
 /* ─── Calendar Tab ─── */
-function CalendarTab({ t, locale }) {
+function CalendarTab({ t, locale, history }) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
@@ -1234,7 +1240,7 @@ function CalendarTab({ t, locale }) {
 
   const getBookingsForDay = (day) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return calendarBookings.filter(b => dateStr >= b.startDate && dateStr <= b.endDate);
+    return history.filter((booking) => String(booking.date || '').slice(0, 10) === dateStr);
   };
 
   return (
@@ -1267,7 +1273,7 @@ function CalendarTab({ t, locale }) {
                   <div className="space-y-0.5 mt-1">
                     {bookings.map((b, j) => (
                       <div key={j} className="bg-orange-100 text-orange-800 rounded px-1 py-0.5 text-[7px] truncate font-bold">
-                        {b.bikeName.split(' ').slice(0, 2).join(' ')}
+                        {(b.bike || b.bikeName || 'Sepeda').split(' ').slice(0, 2).join(' ')}
                       </div>
                     ))}
                   </div>
@@ -1828,7 +1834,7 @@ function getRewardIcon(reward) {
 }
 
 /* ─── Spin Wheel & Points Tab ─── */
-function SpinWheelAndPointsTab({ t, locale }) {
+function SpinWheelAndPointsTab({ t, locale, startingPoints = 0, onPointsChange }) {
   const canvasRef = useRef(null);
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState(null);
@@ -1836,9 +1842,9 @@ function SpinWheelAndPointsTab({ t, locale }) {
   const [spinHistory, setSpinHistory] = useState([]);
   const [currentPoints, setCurrentPoints] = useState(() => {
     if (typeof window !== 'undefined') {
-      return parseInt(localStorage.getItem('memberPoints') || String(memberData.points));
+      return parseInt(localStorage.getItem('memberPoints') || String(startingPoints || 0));
     }
-    return memberData.points;
+    return startingPoints || 0;
   });
 
   // Prize claim modal
@@ -2019,6 +2025,7 @@ function SpinWheelAndPointsTab({ t, locale }) {
         const newPoints = currentPoints - SPIN_COST;
         setCurrentPoints(newPoints);
         localStorage.setItem('memberPoints', String(newPoints));
+        onPointsChange?.(newPoints);
 
         // Save spin history
         setSpinHistory(prev => [
@@ -2048,6 +2055,7 @@ function SpinWheelAndPointsTab({ t, locale }) {
     const newPoints = currentPoints - exchangeModal.cost;
     setCurrentPoints(newPoints);
     localStorage.setItem('memberPoints', String(newPoints));
+    onPointsChange?.(newPoints);
     const claimCode = `KP-XCH-${Date.now().toString(36).toUpperCase()}`;
     setClaimModal({ type: 'exchange', prize: exchangeModal.name[locale] || exchangeModal.name.id, code: claimCode });
     setExchangeModal(null);
@@ -2143,7 +2151,7 @@ function SpinWheelAndPointsTab({ t, locale }) {
               <Award size={15} className="text-amber-500" /> Katalog Penukaran Poin
             </h3>
             <div className="space-y-2.5">
-              {memberData.rewards.map(reward => (
+              {memberRewards.map(reward => (
                 <div key={reward.id} className="p-3.5 rounded-2xl bg-slate-50/70 hover:bg-slate-50 border border-slate-100 flex items-center justify-between gap-3 transition-colors">
                   <div className="flex items-center gap-3">
                     {getRewardIcon(reward)}
@@ -2263,8 +2271,8 @@ function SpinWheelAndPointsTab({ t, locale }) {
 
 
 /* ─── Referral Tab ─── */
-function ReferralTab({ t, locale }) {
-  const d = memberData;
+function ReferralTab({ t, locale, member }) {
+  const d = member;
   const [copied, setCopied] = useState(false);
 
   const copyLink = () => {
@@ -2341,7 +2349,7 @@ export default function MemberPage() {
   const [selectedBookingBike, setSelectedBookingBike] = useState(null);
   const [bookingDraft, setBookingDraft] = useState(null);
   const [showBikeCatalogModal, setShowBikeCatalogModal] = useState(false);
-  const [history, setHistory] = useState(memberData.bookingHistory);
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
     // Check member authentication
@@ -2352,26 +2360,34 @@ export default function MemberPage() {
       setIsAuthenticated(true);
       // Load saved member profile (from registration/login)
       const savedProfile = localStorage.getItem('memberProfile');
+      let parsedProfile = {};
       if (savedProfile) {
         try {
-          setMemberProfile(JSON.parse(savedProfile));
+          parsedProfile = JSON.parse(savedProfile);
         } catch (e) { /* use defaults */ }
       }
+
+      // Remove the old demo points once. They were never tied to the signed-in user.
+      if (!localStorage.getItem('memberDemoCleanupV1')) {
+        localStorage.removeItem('memberPoints');
+        localStorage.setItem('memberDemoCleanupV1', 'done');
+      }
+
+      let savedHistory = [];
+      const saved = localStorage.getItem('memberBookings');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) savedHistory = parsed;
+        } catch (e) { /* ignore invalid local data */ }
+      }
+      setHistory(savedHistory);
+      const points = Number(localStorage.getItem('memberPoints') || parsedProfile.points || 0);
+      const normalizedProfile = normalizeMemberProfile(parsedProfile, savedHistory, points);
+      setMemberProfile(normalizedProfile);
+      localStorage.setItem('memberProfile', JSON.stringify(normalizedProfile));
     }
     setIsChecking(false);
-
-    // Load saved bookings
-    const saved = localStorage.getItem('memberBookings');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setTimeout(() => {
-            setHistory([...parsed, ...memberData.bookingHistory]);
-          }, 0);
-        }
-      } catch (e) { /* ignore */ }
-    }
 
     // Auto-open booking modal from URL ?bookBike=<id> (landing page → member PWA flow)
     if (typeof window !== 'undefined') {
@@ -2406,6 +2422,19 @@ export default function MemberPage() {
   const handleBookingSuccess = (newBooking) => {
     setHistory(prev => [newBooking, ...prev]);
   };
+
+  const handlePointsChange = useCallback((points) => {
+    setMemberProfile((current) => {
+      const updated = { ...(current || {}), points };
+      localStorage.setItem('memberProfile', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const member = useMemo(
+    () => normalizeMemberProfile(memberProfile || {}, history, memberProfile?.points || 0),
+    [memberProfile, history],
+  );
 
   if (isChecking) {
     return <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">Memuat Member Portal...</div>;
@@ -2488,10 +2517,10 @@ export default function MemberPage() {
           <p className="text-white text-xs font-semibold mb-1 opacity-90">Selamat datang kembali,</p>
           <div className="flex items-center gap-2.5">
             <h1 className="text-white font-extrabold text-xl sm:text-2xl drop-shadow-lg leading-none">
-              {memberProfile?.name || memberData.name}
+              {member.name}
             </h1>
             <span className="px-2.5 py-0.5 rounded-full bg-amber-400/25 text-amber-200 border border-amber-400/50 text-[10px] font-black uppercase backdrop-blur-sm">
-              {memberData.level}
+              {member.level}
             </span>
           </div>
         </div>
@@ -2527,6 +2556,7 @@ export default function MemberPage() {
               onStartBooking={(bike) => setSelectedBookingBike(bike)}
               onOpenBikeCatalog={() => setShowBikeCatalogModal(true)}
               history={history}
+              member={member}
             />
           )}
           {activeTab === 'tracker' && (
@@ -2536,13 +2566,13 @@ export default function MemberPage() {
             <RuteGowesTab t={t} locale={locale} />
           )}
           {activeTab === 'calendar' && (
-            <CalendarTab t={t} locale={locale} />
+            <CalendarTab t={t} locale={locale} history={history} />
           )}
           {activeTab === 'points' && (
-            <SpinWheelAndPointsTab t={t} locale={locale} />
+            <SpinWheelAndPointsTab t={t} locale={locale} startingPoints={member.points} onPointsChange={handlePointsChange} />
           )}
           {activeTab === 'referral' && (
-            <ReferralTab t={t} locale={locale} />
+            <ReferralTab t={t} locale={locale} member={member} />
           )}
         </div>
       </div>
@@ -2551,7 +2581,7 @@ export default function MemberPage() {
       {selectedBookingBike && (
         <InAppBookingModal
           bike={selectedBookingBike}
-          member={memberProfile}
+          member={member}
           initialDraft={bookingDraft}
           onClose={() => setSelectedBookingBike(null)}
           onChangeBike={() => { setSelectedBookingBike(null); setShowBikeCatalogModal(true); }}

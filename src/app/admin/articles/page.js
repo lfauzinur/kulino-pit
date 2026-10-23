@@ -1,8 +1,8 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Eye, Type, Image as ImageIcon, Bold, Italic, List, Grid, Link as LinkIcon,
-  Code, Trash2, ArrowDown, ArrowUp, Plus, Save, X,
+  Code, Trash2, ArrowDown, ArrowUp, Plus, Save, X, Pencil, FileText, RefreshCw,
 } from 'lucide-react';
 
 const newTextBlock = () => ({ id: crypto.randomUUID(), type: 'text', title: '', content: '' });
@@ -29,11 +29,88 @@ export default function AdminArticlesPage() {
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [savedArticles, setSavedArticles] = useState([]);
+  const [loadingArticles, setLoadingArticles] = useState(true);
+  const [editingSlug, setEditingSlug] = useState(null);
   const fileInputs = useRef({});
 
   const currentTitle = title[language];
   const previewTitle = title[language] || title.id || title.en || 'Untitled article';
   const firstImage = useMemo(() => blocks.find((block) => block.type === 'image' && block.url)?.url, [blocks]);
+
+  const loadArticles = useCallback(async () => {
+    setLoadingArticles(true);
+    try {
+      const response = await fetch('/api/articles?admin=1', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Daftar artikel gagal dimuat.');
+      setSavedArticles(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoadingArticles(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(loadArticles, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadArticles]);
+
+  const resetEditor = () => {
+    setEditingSlug(null);
+    setTitle({ id: '', en: '' });
+    setPublishedGlobally(true);
+    setPublishedEnglish(true);
+    setMetaForm({ metaTitle: '', metaDescription: '', keywords: '' });
+    setSeoForm({ slug: '', canonical: '' });
+    setAuthor('Kulino Team');
+    setCategory('Berita');
+    setTags([]);
+    setTagInput('');
+    setPublishedAt(new Date().toISOString().slice(0, 16));
+    setBlocks([newTextBlock(), newImageBlock()]);
+    setActiveTab('Content');
+    setMessage('Editor siap untuk artikel baru.');
+  };
+
+  const editArticle = (article) => {
+    setEditingSlug(article.slug);
+    setTitle({ id: article.title?.id || '', en: article.title?.en || '' });
+    setPublishedGlobally(Boolean(article.publishedGlobally));
+    setPublishedEnglish(Boolean(article.publishedEnglish));
+    setMetaForm({
+      metaTitle: article.meta?.title || '',
+      metaDescription: article.meta?.description || '',
+      keywords: article.meta?.keywords || '',
+    });
+    setSeoForm({ slug: article.slug || '', canonical: article.meta?.canonical || '' });
+    setAuthor(article.author || 'Kulino Team');
+    setCategory(article.category?.id || 'Berita');
+    setTags(Array.isArray(article.tags) ? article.tags : []);
+    setPublishedAt(`${article.date || new Date().toISOString().slice(0, 10)}T09:00`);
+    const content = Array.isArray(article.content) ? article.content : [];
+    setBlocks(content.length
+      ? content.map((block) => ({ ...block, id: block.id || crypto.randomUUID() }))
+      : [newTextBlock(), { ...newImageBlock(), url: article.image || '', publicId: article.imagePublicId || '' }]);
+    setActiveTab('Content');
+    setMessage(`Mengedit artikel: ${article.title?.id || article.title?.en || article.slug}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const deleteArticle = async (article) => {
+    if (!window.confirm(`Hapus artikel “${article.title?.id || article.slug}”?`)) return;
+    try {
+      const response = await fetch(`/api/articles/${encodeURIComponent(article.slug)}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Artikel gagal dihapus.');
+      if (editingSlug === article.slug) resetEditor();
+      setMessage('Artikel berhasil dihapus.');
+      await loadArticles();
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
 
   const updateBlock = (id, field, value) => {
     setBlocks((current) => current.map((block) => block.id === id ? { ...block, [field]: value } : block));
@@ -91,8 +168,8 @@ export default function AdminArticlesPage() {
     setShowSaveMenu(false);
     setMessage('');
     try {
-      const response = await fetch('/api/articles', {
-        method: 'POST',
+      const response = await fetch(editingSlug ? `/api/articles/${encodeURIComponent(editingSlug)}` : '/api/articles', {
+        method: editingSlug ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           titleId: title.id || title.en,
@@ -116,7 +193,10 @@ export default function AdminArticlesPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Artikel gagal disimpan.');
-      setMessage(status === 'published' ? `Artikel dipublikasikan: /artikel/${data.slug}` : 'Draft berhasil disimpan.');
+      setEditingSlug(data.slug);
+      setSeoForm((current) => ({ ...current, slug: data.slug }));
+      setMessage(status === 'published' ? `Artikel berhasil disimpan: /artikel/${data.slug}` : 'Draft berhasil disimpan.');
+      await loadArticles();
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -126,6 +206,42 @@ export default function AdminArticlesPage() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 p-4 sm:p-6">
+      <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 font-display text-lg font-black text-gray-900"><FileText size={19} className="text-blue-600" /> Artikel Tersimpan</h2>
+            <p className="mt-1 text-xs text-gray-500">Pilih artikel lama untuk mengeditnya, atau buat artikel baru.</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={loadArticles} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50"><RefreshCw size={14} /> Muat ulang</button>
+            <button onClick={resetEditor} className="flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700"><Plus size={14} /> Artikel baru</button>
+          </div>
+        </div>
+        {loadingArticles ? (
+          <div className="rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Memuat artikel…</div>
+        ) : savedArticles.length === 0 ? (
+          <div className="rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Belum ada artikel di database.</div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {savedArticles.map((article) => (
+              <article key={article.slug} className={`rounded-xl border p-3 transition-colors ${editingSlug === article.slug ? 'border-blue-400 bg-blue-50/50' : 'border-gray-100 bg-gray-50/70'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-gray-900">{article.title?.id || article.title?.en || article.slug}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">{article.status} · {article.date}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-[9px] font-black ${article.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{article.status === 'published' ? 'TAYANG' : 'DRAFT'}</span>
+                </div>
+                <div className="mt-3 flex gap-2 border-t border-gray-200 pt-3">
+                  <button onClick={() => editArticle(article)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-bold text-blue-600 shadow-sm hover:bg-blue-50"><Pencil size={13} /> Edit</button>
+                  <button onClick={() => deleteArticle(article)} className="flex items-center justify-center rounded-lg bg-white px-3 py-2 text-red-500 shadow-sm hover:bg-red-50" title="Hapus artikel"><Trash2 size={14} /></button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <input
           value={currentTitle}
@@ -140,7 +256,7 @@ export default function AdminArticlesPage() {
           </select>
           <button onClick={() => setShowPreview(true)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"><Eye size={16} /> Preview</button>
           <div className="relative flex">
-            <button disabled={saving} onClick={() => saveArticle('published')} className="rounded-l-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Save size={15} className="mr-1 inline" />{saving ? 'Saving…' : 'Publish'}</button>
+            <button disabled={saving} onClick={() => saveArticle('published')} className="rounded-l-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Save size={15} className="mr-1 inline" />{saving ? 'Saving…' : editingSlug ? 'Update' : 'Publish'}</button>
             <button onClick={() => setShowSaveMenu((value) => !value)} className="rounded-r-lg border-l border-blue-700 bg-blue-600 px-3 text-white">▾</button>
             {showSaveMenu && <div className="absolute right-0 top-11 z-20 w-40 rounded-xl border bg-white p-1 shadow-lg"><button onClick={() => saveArticle('draft')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50">Save as draft</button></div>}
           </div>

@@ -203,43 +203,6 @@ export const testimonials = [
   { id: 4, name: 'Dewi Anggraini', avatar: '👩‍🦱', role: 'Mitra Partner', rating: 5, text: { id: 'Sepeda saya yang nganggur sekarang jadi sumber income. Prosesnya mudah dan transparan.', en: 'My idle bike is now a source of income. The process is easy and transparent.' } },
 ];
 
-export const articles = [
-  { id: 1, title: { id: '5 Rute Gowes Terbaik di Banyuwangi', en: '5 Best Cycling Routes in Banyuwangi' }, excerpt: { id: 'Temukan rute-rute indah yang wajib dicoba untuk penggemar bersepeda di Banyuwangi.', en: 'Discover beautiful must-try routes for cycling enthusiasts in Banyuwangi.' }, date: '2026-09-28', category: { id: 'Rute Gowes', en: 'Cycling Routes' }, image: '/images/hero-banner.png' },
-  { id: 2, title: { id: 'Panduan Perawatan Sepeda Road Bike', en: 'Road Bike Maintenance Guide' }, excerpt: { id: 'Tips dan trik merawat road bike agar tetap optimal dan awet digunakan.', en: 'Tips and tricks to maintain your road bike for optimal and lasting use.' }, date: '2026-09-20', category: { id: 'Tips & Trik', en: 'Tips & Tricks' }, image: '/images/bikes/roadbike.png' },
-  { id: 3, title: { id: 'Event Cycling Banyuwangi Festival 2026', en: 'Banyuwangi Cycling Festival 2026' }, excerpt: { id: 'Laporan lengkap event cycling terbesar di Banyuwangi yang diselenggarakan bulan lalu.', en: 'Complete report on the biggest cycling event in Banyuwangi held last month.' }, date: '2026-09-15', category: { id: 'Event', en: 'Events' }, image: '/images/hero-banner.png' },
-];
-
-export const memberData = {
-  name: 'Andi Pratama',
-  email: 'andi@email.com',
-  memberId: 'KP-2026-0089',
-  points: 1250,
-  level: 'Gold',
-  totalBookings: 12,
-  referralCode: 'ANDI2026',
-  referralLink: 'https://kulinopit.id/ref/ANDI2026',
-  referralStats: { clicks: 245, signups: 18, earnings: 540000 },
-  bookingHistory: [
-    { id: 'BK001', bike: 'Polygon Helios C8', date: '2026-09-25', duration: '2 hari', total: 500000, status: 'completed', points: 50 },
-    { id: 'BK002', bike: 'Brompton C Line', date: '2026-09-18', duration: '1 hari', total: 300000, status: 'completed', points: 30 },
-    { id: 'BK003', bike: 'Specialized Vado SL', date: '2026-10-05', duration: '3 hari', total: 1050000, status: 'upcoming', points: 0 },
-  ],
-  rewards: [
-    { id: 1, name: { id: 'Diskon 10% Booking', en: '10% Booking Discount' }, cost: 100, iconType: 'discount' },
-    { id: 2, name: { id: 'Free Helm MTB', en: 'Free MTB Helmet' }, cost: 200, iconType: 'helmet' },
-    { id: 3, name: { id: 'Kaos Kulino Pit', en: 'Kulino Pit T-Shirt' }, cost: 500, iconType: 'shirt' },
-    { id: 4, name: { id: 'Free Half-Day Tour', en: 'Free Half-Day Tour' }, cost: 1000, iconType: 'tour' },
-  ],
-};
-
-export const calendarBookings = [
-  { bikeId: 1, bikeName: 'Polygon Helios C8', userId: 'User 89', startDate: '2026-10-12', endDate: '2026-10-14' },
-  { bikeId: 2, bikeName: 'Polygon Siskiu T8', userId: 'User 23', startDate: '2026-10-08', endDate: '2026-10-10' },
-  { bikeId: 3, bikeName: 'Brompton C Line', userId: 'User 45', startDate: '2026-10-15', endDate: '2026-10-16' },
-  { bikeId: 4, bikeName: 'Specialized Vado SL', userId: 'User 12', startDate: '2026-10-05', endDate: '2026-10-07' },
-  { bikeId: 1, bikeName: 'Polygon Helios C8', userId: 'User 67', startDate: '2026-10-20', endDate: '2026-10-22' },
-];
-
 export function formatCurrency(amount) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 }
