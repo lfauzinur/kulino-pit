@@ -1,31 +1,21 @@
 'use client';
+import { useEffect, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import Link from 'next/link';
 import { Camera, Truck, Users, Flag, ShieldCheck, Mic, Wrench, HeartPulse, Siren } from 'lucide-react';
 
 export default function LayananPage() {
   const { t, locale } = useI18n();
+  const [mainServices, setMainServices] = useState([]);
 
-  const mainServices = [
-    {
-      icon: <Camera size={28} />, title: t('services.documentation.title'), desc: t('services.documentation.desc'),
-      features: t('services.documentation.features'),
-      price: t('services.documentation.price'),
-      color: '#3B82F6',
-    },
-    {
-      icon: <Truck size={28} />, title: t('services.trucking.title'), desc: t('services.trucking.desc'),
-      features: t('services.trucking.features'),
-      price: t('services.trucking.price'),
-      color: '#F59E0B',
-    },
-    {
-      icon: <Users size={28} />, title: t('services.manpower.title'), desc: t('services.manpower.desc'),
-      features: t('services.manpower.features'),
-      price: t('services.manpower.price'),
-      color: '#10B981',
-    },
-  ];
+  useEffect(() => {
+    fetch('/api/services', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(setMainServices)
+      .catch(() => setMainServices([]));
+  }, []);
+
+  const serviceIcons = { camera: Camera, truck: Truck, users: Users };
 
   const manpowerRoles = [
     { role: t('services.items.roadCaptain.name'), icon: <Flag size={22} />, desc: t('services.items.roadCaptain.desc'), color: '#F59E0B' },
@@ -46,15 +36,17 @@ export default function LayananPage() {
 
         {/* Main Services */}
         <div className="grid gap-6 lg:grid-cols-3 mb-16">
-          {mainServices.map((svc, i) => (
-            <div key={i} className="brutal-card p-6 flex flex-col">
-              <div className="w-16 h-16 border-3 border-black flex items-center justify-center mb-5 rounded-xl" style={{ backgroundColor: svc.color + '15', color: svc.color }}>
-                {svc.icon}
+          {mainServices.map((svc) => {
+            const ServiceIcon = serviceIcons[svc.icon] || Camera;
+            return (
+            <div key={svc.id} className="brutal-card p-6 flex flex-col">
+              <div className="w-16 h-16 border border-gray-200 flex items-center justify-center mb-5 rounded-xl" style={{ backgroundColor: svc.accentColor + '15', color: svc.accentColor }}>
+                <ServiceIcon size={28} />
               </div>
-              <h2 className="font-display font-black text-lg">{svc.title}</h2>
-              <p className="mt-2 text-xs text-[var(--color-gray-500)] leading-6">{svc.desc}</p>
+              <h2 className="font-display font-black text-lg">{svc.title[locale] || svc.title.id}</h2>
+              <p className="mt-2 text-xs text-[var(--color-gray-500)] leading-6">{svc.description[locale] || svc.description.id}</p>
               <ul className="mt-4 space-y-2 flex-1">
-                {svc.features.map((feat, j) => (
+                {(svc.features[locale] || svc.features.id).map((feat, j) => (
                   <li key={j} className="flex items-start gap-2 text-xs">
                     <span className="w-5 h-5 border-2 border-black bg-[var(--color-green-light)] text-[var(--color-green)] flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">✓</span>
                     {feat}
@@ -62,13 +54,13 @@ export default function LayananPage() {
                 ))}
               </ul>
               <div className="mt-6 pt-4 border-t-2 border-dashed border-[var(--color-gray-300)] flex items-center justify-between">
-                <p className="text-sm font-display font-black text-[var(--color-orange)]">{svc.price}</p>
+                <p className="text-sm font-display font-black text-[var(--color-primary)]">{svc.priceLabel}</p>
                 <a href="https://wa.me/6281234567890" className="brutal-btn brutal-btn-primary px-4 py-2 text-[9px] !shadow-[var(--shadow-brutal-sm)]">
                   WhatsApp →
                 </a>
               </div>
             </div>
-          ))}
+          );})}
         </div>
 
         {/* Manpower Roles */}

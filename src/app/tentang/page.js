@@ -97,14 +97,14 @@ export default function TentangPage() {
               
               <div className="prose prose-lg text-gray-600">
                 <p className="leading-relaxed">
-                  Sesuai namanya, "Kulino Nge Pit" hadir buat ngajakin kamu membiasakan diri menikmati setiap sudut jalanan dengan roda dua. Kami menyediakan layanan sewa sepeda yang nyaman, plus paket Trip & Tour bersepeda yang siap nemenin kamu jalan-jalan seru di Banyuwangi.
+                  Sesuai namanya, &ldquo;Kulino Nge Pit&rdquo; hadir buat ngajakin kamu membiasakan diri menikmati setiap sudut jalanan dengan roda dua. Kami menyediakan layanan sewa sepeda yang nyaman, plus paket Trip & Tour bersepeda yang siap nemenin kamu jalan-jalan seru di Banyuwangi.
                 </p>
                 <p className="leading-relaxed">
                   Mulai dari gowes santai menyusuri pesisir pantai, menikmati semilir angin di pedesaan yang asri, sampai menjelajahi spot-spot hits lokal yang tersembunyi—semuanya terasa lebih hidup saat dikayuh bareng!
                 </p>
                 
                 <blockquote className="border-l-4 border-[var(--color-primary)] pl-6 py-2 my-8 bg-blue-50/50 rounded-r-2xl italic font-medium text-gray-800">
-                  "Di Kulino Nge Pit, sepeda bukan cuma sekadar alat transportasi, tapi juga cara terbaik buat 'pelan sebentar', meresapi keindahan alam Banyuwangi, dan ngumpulin momen berkesan."
+                  &ldquo;Di Kulino Nge Pit, sepeda bukan cuma sekadar alat transportasi, tapi juga cara terbaik buat &lsquo;pelan sebentar&rsquo;, meresapi keindahan alam Banyuwangi, dan ngumpulin momen berkesan.&rdquo;
                 </blockquote>
                 
                 <p className="font-bold text-xl text-gray-900 mt-8 flex items-center gap-3">
@@ -119,28 +119,23 @@ export default function TentangPage() {
 
       {/* Location Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
-        <div className="clean-card bg-gray-900 text-white p-10 overflow-hidden relative">
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div>
-              <h3 className="font-display font-black text-2xl mb-2 flex items-center gap-3">
+        <div className="clean-card relative overflow-hidden border border-blue-100 bg-gradient-to-br from-[#eef8ff] via-white to-[#fff8e8] p-7 sm:p-10">
+          <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, #4BA3E3 1px, transparent 0)', backgroundSize: '26px 26px' }}></div>
+          <div className="relative z-10 grid items-center gap-8 md:grid-cols-[1fr_300px]">
+            <div className="max-w-2xl">
+              <span className="mb-4 inline-flex rounded-full bg-blue-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700">Datang & Ngopi Sebelum Gowes</span>
+              <h3 className="font-display font-black text-2xl text-gray-900 mb-3 flex items-center gap-3">
                 <MapPin className="text-[var(--color-primary)]" />
                 Basecamp Kulino House
               </h3>
-              <p className="text-gray-400 max-w-md">
+              <p className="max-w-xl text-gray-600 leading-7">
                 Kunjungi markas kami untuk melihat langsung koleksi sepeda, berdiskusi tentang rute, atau sekadar ngopi santai sebelum gowes!
               </p>
+              <a href="https://maps.app.goo.gl/3Q8x9vCqLgX2F" target="_blank" rel="noopener noreferrer" className="btn btn-primary mt-6 inline-flex px-6 py-3 font-bold shadow-md">Lihat di Google Maps →</a>
             </div>
-            <a 
-              href="https://maps.google.com" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="btn bg-[var(--color-primary)] text-white hover:bg-blue-700 px-6 py-3 shrink-0 shadow-[4px_4px_0px_white] hover:shadow-[2px_2px_0px_white] hover:translate-y-[2px] hover:translate-x-[2px] transition-all font-bold"
-            >
-              Lihat di Google Maps
-            </a>
+            <div className="relative h-52 w-full md:h-60">
+              <Image src="/images/store-illustration.webp" alt="Ilustrasi Kulino House" fill className="object-contain drop-shadow-xl" />
+            </div>
           </div>
         </div>
       </div>

@@ -36,11 +36,15 @@ function StepIndicator({ current, steps }) {
 }
 
 /* Step 1: Bike Selection */
-function Step1({ bikesList, selected, onSelect, locale, t }) {
+function Step1({ bikesList, selected, onSelect, locale, t, requestedBike }) {
   const available = bikesList.filter(b => b.available);
   return (
     <div className="animate-fade-in">
-      <h2 className="font-display font-black text-2xl mb-6 text-gray-900">Pilih sepeda Anda</h2>
+      <h2 className="font-display font-black text-2xl mb-3 text-gray-900">Ketersediaan Unit</h2>
+      {requestedBike && <div className={`mb-6 rounded-2xl border p-4 ${requestedBike.available ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center"><div><p className={`text-sm font-black ${requestedBike.available ? 'text-green-800' : 'text-red-700'}`}>{requestedBike.name}</p><p className="mt-1 text-xs text-gray-600">{requestedBike.available ? `${requestedBike.availableStock} dari ${requestedBike.stockCount} unit tersedia dan siap dipesan.` : `Stok sedang kosong (${requestedBike.rentedCount}/${requestedBike.stockCount} unit dipakai atau unit dinonaktifkan). Silakan pilih unit lain di bawah.`}</p></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black ${requestedBike.available ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{requestedBike.available ? 'TERSEDIA' : 'KOSONG'}</span></div>
+      </div>}
+      <p className="mb-4 text-sm font-semibold text-gray-500">{requestedBike?.available ? 'Unit pilihan Anda sudah tersedia. Anda dapat lanjut atau memilih model lain.' : 'Pilih sepeda yang tersedia:'}</p>
       <div className="grid gap-4 sm:grid-cols-2">
         {available.map(bike => {
           const lowestPrice = getLowestPrice(bike);
@@ -67,6 +71,7 @@ function Step1({ bikesList, selected, onSelect, locale, t }) {
                     {t(`bikes.categories.${bike.category}`)}
                   </span>
                   <div className="text-right">
+                    <span className="mb-0.5 block text-[9px] font-bold text-green-600">{bike.availableStock} unit tersedia</span>
                     <span className="text-[9px] text-gray-400 block">{locale === 'id' ? 'Mulai' : 'From'}</span>
                     <span className="font-display font-black text-sm text-[var(--color-primary)]">{formatCurrency(lowestPrice)}</span>
                   </div>
@@ -366,6 +371,7 @@ export default function BookingPage() {
   const [bikesList, setBikesList] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [requestedBike, setRequestedBike] = useState(null);
 
   useEffect(() => {
     fetch('/api/bikes', { cache: 'no-store' })
@@ -373,7 +379,14 @@ export default function BookingPage() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then(data => setBikesList(data))
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        setBikesList(list);
+        const requestedId = Number(new URLSearchParams(window.location.search).get('bikeId'));
+        const requested = list.find((bike) => bike.id === requestedId) || null;
+        setRequestedBike(requested);
+        if (requested?.available) setSelectedBike(requested);
+      })
       .catch(console.error);
   }, []);
 
@@ -555,7 +568,7 @@ export default function BookingPage() {
         <StepIndicator current={step} steps={steps} />
 
         <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-100 relative">
-          {step === 0 && <Step1 bikesList={bikesList} selected={selectedBike} onSelect={setSelectedBike} locale={locale} t={t} />}
+          {step === 0 && <Step1 bikesList={bikesList} selected={selectedBike} onSelect={setSelectedBike} locale={locale} t={t} requestedBike={requestedBike} />}
           {step === 1 && <Step2 selectedBike={selectedBike} rentalType={rentalType} setRentalType={setRentalType} dates={dates} setDates={setDates} pickupMethod={pickupMethod} setPickupMethod={setPickupMethod} t={t} locale={locale} />}
           {step === 2 && <Step3 selectedAccessories={selectedAccessories} toggleAccessory={toggleAccessory} setSelectedAccessories={setSelectedAccessories} locale={locale} t={t} />}
           {step === 3 && <Step4 selectedBike={selectedBike} rentalType={rentalType} dates={dates} pickupMethod={pickupMethod} selectedAccessories={selectedAccessories} customerInfo={customerInfo} setCustomerInfo={setCustomerInfo} t={t} locale={locale} />}

@@ -137,18 +137,12 @@ export default function UnitSepedaPage() {
                         <p className="text-[9px] text-[var(--color-gray-500)] mb-0.5">{locale === 'id' ? 'Mulai dari' : 'Starting from'}</p>
                         <p className="font-display font-black text-xl text-[var(--color-orange)]">{formatCurrency(lowestPrice)}</p>
                       </div>
-                      {bike.available ? (
-                        <Link
-                          href="/booking"
-                          className="brutal-btn brutal-btn-primary px-4 py-2.5 text-[10px]"
-                        >
-                          {t('bikes.checkAvail')}
-                        </Link>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-600 font-bold text-[10px] px-4 py-2.5 rounded">
-                          🔒 Sedang Terpesan
-                        </span>
-                      )}
+                      <Link
+                        href={`/booking?bikeId=${bike.id}`}
+                        className={`brutal-btn px-4 py-2.5 text-[10px] ${bike.available ? 'brutal-btn-primary' : 'border border-red-200 bg-red-50 text-red-600'}`}
+                      >
+                        {bike.available ? t('bikes.checkAvail') : 'Cek Alternatif'}
+                      </Link>
                     </div>
                   </div>
                 </article>

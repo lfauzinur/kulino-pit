@@ -1,16 +1,16 @@
 'use client';
-import { use, useState } from 'react';
-import { notFound } from 'next/navigation';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { tours, formatCurrency } from '@/lib/data';
+import { formatCurrency } from '@/lib/data';
 import { useI18n } from '@/lib/i18n';
 import { ChevronLeft, Users, Calendar, MapPin, CheckCircle, Phone, CreditCard, Clock } from 'lucide-react';
 
 export default function TourBookingPage({ params }) {
   const unwrappedParams = use(params);
   const { locale } = useI18n();
-  const tour = tours.find(t => t.slug === unwrappedParams.slug);
+  const [tour, setTour] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     name: '',
@@ -22,7 +22,16 @@ export default function TourBookingPage({ params }) {
   });
   const [submitted, setSubmitted] = useState(false);
 
-  if (!tour) notFound();
+  useEffect(() => {
+    fetch(`/api/tours?slug=${encodeURIComponent(unwrappedParams.slug)}`, { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(setTour)
+      .catch(() => setTour(null))
+      .finally(() => setLoading(false));
+  }, [unwrappedParams.slug]);
+
+  if (loading) return <div className="min-h-[60vh] py-40 text-center font-semibold text-gray-400">Memuat paket tour…</div>;
+  if (!tour) return <div className="min-h-[60vh] py-40 text-center"><h1 className="font-display text-3xl font-black">Tour tidak ditemukan</h1><Link href="/trip-tour" className="mt-5 inline-flex text-[var(--color-primary)]">Kembali ke daftar tour</Link></div>;
 
   const today = new Date().toISOString().split('T')[0];
   const totalPrice = tour.price * form.pax;
@@ -203,7 +212,7 @@ ${form.note ? `Catatan: ${form.note}` : ''}`;
                   </div>
                   <div className="flex items-center gap-3 text-sm text-gray-600">
                     <MapPin size={15} className="text-[var(--color-primary)] shrink-0" />
-                    <span>Kulino House, Banyuwangi</span>
+                    <span>{tour.meetingPoint}</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm text-gray-600">
                     <CreditCard size={15} className="text-[var(--color-primary)] shrink-0" />

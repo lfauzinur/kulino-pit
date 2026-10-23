@@ -127,17 +127,110 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS slug TEXT NOT NULL DEFAULT ''`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS description_id TEXT NOT NULL DEFAULT ''`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS description_en TEXT NOT NULL DEFAULT ''`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS distance TEXT NOT NULL DEFAULT ''`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS difficulty_id TEXT NOT NULL DEFAULT 'Mudah'`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS difficulty_en TEXT NOT NULL DEFAULT 'Easy'`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS image TEXT NOT NULL DEFAULT '/images/hero-banner.png'`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS image_public_id TEXT`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS includes_id JSONB NOT NULL DEFAULT '[]'::jsonb`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS includes_en JSONB NOT NULL DEFAULT '[]'::jsonb`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS meeting_point TEXT NOT NULL DEFAULT 'Kulino House, Banyuwangi'`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS published BOOLEAN NOT NULL DEFAULT true`;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS services (
+          id BIGSERIAL PRIMARY KEY,
+          title_id TEXT NOT NULL,
+          title_en TEXT NOT NULL DEFAULT '',
+          description_id TEXT NOT NULL DEFAULT '',
+          description_en TEXT NOT NULL DEFAULT '',
+          features_id JSONB NOT NULL DEFAULT '[]'::jsonb,
+          features_en JSONB NOT NULL DEFAULT '[]'::jsonb,
+          price_label TEXT NOT NULL DEFAULT '',
+          icon TEXT NOT NULL DEFAULT 'camera',
+          accent_color TEXT NOT NULL DEFAULT '#3B82F6',
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          published BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS gallery_items (
+          id BIGSERIAL PRIMARY KEY,
+          title TEXT NOT NULL,
+          media_type TEXT NOT NULL DEFAULT 'photo',
+          media_url TEXT NOT NULL,
+          media_public_id TEXT,
+          thumbnail_url TEXT NOT NULL DEFAULT '',
+          thumbnail_public_id TEXT,
+          caption TEXT NOT NULL DEFAULT '',
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          published BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_categories_name_lower_idx ON tour_categories (LOWER(name))`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_name_lower_idx ON tour_packages (LOWER(name))`;
       await sql`INSERT INTO tour_categories (name) VALUES ('Group Tours'), ('Private Tours') ON CONFLICT DO NOTHING`;
+      await sql`UPDATE tour_packages SET published = false WHERE slug = ''`;
       await sql`
-        INSERT INTO tour_packages (name, price, category_id, duration)
-        SELECT 'Banyuwangi City Tour', 150000, id, '4 Hours'
-        FROM tour_categories
-        WHERE name = 'Group Tours'
-          AND NOT EXISTS (SELECT 1 FROM tour_packages WHERE name = 'Banyuwangi City Tour')
-        LIMIT 1
+        INSERT INTO tour_packages (
+          name, slug, price, category_id, duration, distance, difficulty_id, difficulty_en,
+          description_id, description_en, image, includes_id, includes_en, meeting_point, published
+        )
+        SELECT
+          seed.name, seed.slug, seed.price, category.id, seed.duration, seed.distance,
+          seed.difficulty_id, seed.difficulty_en, seed.description_id, seed.description_en,
+          '/images/hero-banner.png', seed.includes_id::jsonb, seed.includes_en::jsonb,
+          'Kulino House, Banyuwangi', true
+        FROM (
+          VALUES
+            ('City Tour Sunrise Ride', 'city-tour-sunrise-ride', 450000, '4 jam', '35 km', 'Mudah', 'Easy',
+             'Nikmati sunrise spektakuler sambil bersepeda menyusuri jalanan kota yang masih sepi di pagi hari.',
+             'Enjoy a spectacular sunrise while cycling through the quiet city streets in the early morning.',
+             '["Sepeda & Helm","Road Captain","Snack & Air Mineral","Dokumentasi Foto"]',
+             '["Bike & Helmet","Road Captain","Snack & Water","Photo Documentation"]'),
+            ('Mountain Scenic Trail', 'mountain-scenic-trail', 750000, '6 jam', '45 km', 'Sedang', 'Medium',
+             'Petualangan off-road menyusuri jalur pegunungan dengan pemandangan alam yang memukau.',
+             'Off-road adventure through mountain trails with breathtaking natural views.',
+             '["MTB & Helm","Road Captain + Sweeper","Makan Siang Lokal","Dokumentasi Drone","Tim Medis"]',
+             '["MTB & Helmet","Road Captain + Sweeper","Local Lunch","Drone Documentation","Medical Team"]'),
+            ('Coastal Explorer Full Day', 'coastal-explorer-full-day', 1200000, '8 jam', '65 km', 'Sulit', 'Hard',
+             'Tour sehari penuh menyusuri pesisir pantai dengan dukungan tim lengkap dan pengalaman tak terlupakan.',
+             'Full day tour along the coast with complete team support and an unforgettable experience.',
+             '["Sepeda Premium","Full Support Team","Makan Siang + Snack","Dokumentasi Full","Jersey Eksklusif","Medali Finisher"]',
+             '["Premium Bike","Full Support Team","Lunch + Snacks","Full Documentation","Exclusive Jersey","Finisher Medal"]')
+        ) AS seed(name, slug, price, duration, distance, difficulty_id, difficulty_en, description_id, description_en, includes_id, includes_en)
+        CROSS JOIN LATERAL (SELECT id FROM tour_categories WHERE name = 'Group Tours' LIMIT 1) category
+        WHERE NOT EXISTS (SELECT 1 FROM tour_packages WHERE tour_packages.slug = seed.slug)
         ON CONFLICT DO NOTHING
+      `;
+
+      await sql`
+        INSERT INTO services (title_id, title_en, description_id, description_en, features_id, features_en, price_label, icon, accent_color, sort_order)
+        SELECT * FROM (VALUES
+          ('Dokumentasi Profesional', 'Professional Documentation', 'Layanan foto & video profesional menggunakan Drone, DSLR, dan Action Cam saat gowes.', 'Professional cycling photo and video service using drones, DSLR, and action cameras.', '["Drone DJI Mavic 3 Pro","DSLR Canon EOS R5","GoPro Hero 12 Black","Video Edit & Highlight Reel","Foto High-Res Unlimited"]'::jsonb, '["DJI Mavic 3 Pro Drone","Canon EOS R5 DSLR","GoPro Hero 12 Black","Video Edit & Highlight Reel","Unlimited High-Res Photos"]'::jsonb, 'Mulai dari Rp 500.000', 'camera', '#3B82F6', 10),
+          ('Angkut Sepeda (Trucking)', 'Bike Transport (Trucking)', 'Transportasi pengangkutan sepeda antar kota atau ke titik start event.', 'Bike transportation between cities or to an event starting point.', '["Pickup truck hingga 20 unit sepeda","Antar-jemput ke titik start/finish","Antar kota Jawa & Bali","Asuransi pengangkutan","Pengemasan aman dengan foam padding"]'::jsonb, '["Pickup truck for up to 20 bikes","Start/finish point pickup","Java & Bali intercity","Transport insurance","Safe foam-padded packing"]'::jsonb, 'Mulai dari Rp 750.000', 'truck', '#F59E0B', 20),
+          ('Manpower Event & Escort', 'Event Manpower & Escort', 'Road Captain, Marshal, MC Event, Mekanik, Tim Medis, dan Patwal.', 'Road Captain, Marshal, Event MC, Mechanic, Medical Team, and Escort.', '["Road Captain bersertifikat","Marshal & Sweeper berpengalaman","MC Event profesional","Mekanik terlatih","Tim medis siaga","Patwal resmi"]'::jsonb, '["Certified Road Captain","Experienced Marshal & Sweeper","Professional Event MC","Trained Mechanic","Standby Medical Team","Official Escort"]'::jsonb, 'Harga disesuaikan', 'users', '#10B981', 30)
+        ) AS seed(title_id, title_en, description_id, description_en, features_id, features_en, price_label, icon, accent_color, sort_order)
+        WHERE NOT EXISTS (SELECT 1 FROM services)
+      `;
+
+      await sql`
+        INSERT INTO gallery_items (title, media_type, media_url, thumbnail_url, caption, sort_order)
+        SELECT * FROM (VALUES
+          ('Sunrise Ride Banyuwangi', 'photo', '/images/hero-banner.png', '/images/hero-banner.png', 'Gowes pagi menikmati panorama Banyuwangi.', 10),
+          ('Koleksi Sepeda Kulino Pit', 'photo', '/images/tour_gallery_1.png', '/images/tour_gallery_1.png', 'Unit pilihan untuk berbagai medan dan kebutuhan.', 20),
+          ('Kulino Pit Ride Highlight', 'video', '/videos/kulino-pit-highlight.mp4', '/images/hero-banner.png', 'Cuplikan perjalanan, unit, dan suasana gowes bersama Kulino Pit.', 30)
+        ) AS seed(title, media_type, media_url, thumbnail_url, caption, sort_order)
+        WHERE NOT EXISTS (SELECT 1 FROM gallery_items)
       `;
 
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
@@ -145,6 +238,9 @@ export function ensureAppDatabase() {
       await sql`CREATE INDEX IF NOT EXISTS partner_status_idx ON partner_applications (status)`;
       await sql`CREATE INDEX IF NOT EXISTS articles_status_idx ON articles (status, published_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS tour_packages_category_idx ON tour_packages (category_id)`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_slug_idx ON tour_packages (slug) WHERE slug <> ''`;
+      await sql`CREATE INDEX IF NOT EXISTS services_sort_idx ON services (published, sort_order, id)`;
+      await sql`CREATE INDEX IF NOT EXISTS gallery_items_sort_idx ON gallery_items (published, sort_order, id)`;
     })().catch((error) => {
       schemaPromise = undefined;
       throw error;
@@ -263,5 +359,60 @@ export function articleRow(row) {
       keywords: row.keywords,
       canonical: row.canonical_url,
     },
+  };
+}
+
+export function tourRow(row) {
+  return {
+    id: Number(row.id),
+    slug: row.slug,
+    name: { id: row.name, en: row.name },
+    price: Number(row.price),
+    categoryId: Number(row.category_id),
+    category: row.category_name,
+    duration: row.duration,
+    distance: row.distance,
+    difficulty: { id: row.difficulty_id, en: row.difficulty_en },
+    description: { id: row.description_id, en: row.description_en },
+    image: row.image,
+    imagePublicId: row.image_public_id,
+    includes: {
+      id: Array.isArray(row.includes_id) ? row.includes_id : [],
+      en: Array.isArray(row.includes_en) ? row.includes_en : [],
+    },
+    meetingPoint: row.meeting_point,
+    published: Boolean(row.published),
+  };
+}
+
+export function serviceRow(row) {
+  return {
+    id: Number(row.id),
+    title: { id: row.title_id, en: row.title_en || row.title_id },
+    description: { id: row.description_id, en: row.description_en || row.description_id },
+    features: {
+      id: Array.isArray(row.features_id) ? row.features_id : [],
+      en: Array.isArray(row.features_en) ? row.features_en : [],
+    },
+    priceLabel: row.price_label,
+    icon: row.icon,
+    accentColor: row.accent_color,
+    sortOrder: Number(row.sort_order),
+    published: Boolean(row.published),
+  };
+}
+
+export function galleryRow(row) {
+  return {
+    id: Number(row.id),
+    title: row.title,
+    type: row.media_type,
+    mediaUrl: row.media_url,
+    mediaPublicId: row.media_public_id,
+    thumbnailUrl: row.thumbnail_url || row.media_url,
+    thumbnailPublicId: row.thumbnail_public_id,
+    caption: row.caption,
+    sortOrder: Number(row.sort_order),
+    published: Boolean(row.published),
   };
 }

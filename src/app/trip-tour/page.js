@@ -1,11 +1,22 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useI18n } from '@/lib/i18n';
-import { tours, formatCurrency } from '@/lib/data';
+import { formatCurrency } from '@/lib/data';
 
 export default function TripTourPage() {
   const { t, locale } = useI18n();
+  const [tours, setTours] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/tours', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(setTours)
+      .catch(() => setTours([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="py-12">
@@ -15,6 +26,7 @@ export default function TripTourPage() {
           <h1 className="mt-3 font-display text-4xl sm:text-5xl font-black">{t('tours.subtitle')}</h1>
         </div>
 
+        {loading && <div className="py-16 text-center text-sm font-semibold text-gray-400">Memuat paket tour…</div>}
         <div className="grid gap-8">
           {tours.map((tour, i) => (
             <article key={tour.id} className={`brutal-card overflow-hidden !shadow-[var(--shadow-brutal-lg)] grid lg:grid-cols-2 ${i % 2 === 1 ? 'lg:direction-rtl' : ''}`}>

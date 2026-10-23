@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
-import { ensureAppDatabase, sql } from '@/lib/app-database';
+import { ensureAppDatabase, sql, tourRow } from '@/lib/app-database';
 
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
+const textList = (value) => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+const slugify = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 async function getId(params) {
   const { id: rawId } = await params;
@@ -19,24 +21,33 @@ export async function PATCH(request, { params }) {
     const id = await getId(params);
     const body = await request.json();
     const name = String(body.name || '').trim();
+    const slug = slugify(body.slug || name);
     const duration = String(body.duration || '').trim();
     const price = Number(body.price);
     const categoryId = Number(body.categoryId);
-    if (!id || !name || !duration || !Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(categoryId)) {
+    if (!id || !name || !slug || !duration || !Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(categoryId)) {
       return NextResponse.json({ error: 'Data paket tour tidak valid.' }, { status: 400, headers: noStore });
     }
-    const duplicate = await sql`SELECT id FROM tour_packages WHERE LOWER(name) = LOWER(${name}) AND id <> ${id} LIMIT 1`;
+    const duplicate = await sql`SELECT id FROM tour_packages WHERE (LOWER(name) = LOWER(${name}) OR slug = ${slug}) AND id <> ${id} LIMIT 1`;
     if (duplicate.length) return NextResponse.json({ error: 'Paket tour dengan nama tersebut sudah ada.' }, { status: 409, headers: noStore });
     const rows = await sql`
       UPDATE tour_packages p
-      SET name = ${name}, price = ${price}, category_id = ${categoryId}, duration = ${duration}, updated_at = NOW()
+      SET name = ${name}, slug = ${slug}, price = ${price}, category_id = ${categoryId}, duration = ${duration},
+          distance = ${String(body.distance || '').trim()}, difficulty_id = ${String(body.difficultyId || 'Mudah').trim()},
+          difficulty_en = ${String(body.difficultyEn || 'Easy').trim()},
+          description_id = ${String(body.descriptionId || '').trim()},
+          description_en = ${String(body.descriptionEn || body.descriptionId || '').trim()},
+          image = ${String(body.image || '/images/hero-banner.png')}, image_public_id = ${body.imagePublicId || null},
+          includes_id = ${JSON.stringify(textList(body.includesId))}::jsonb,
+          includes_en = ${JSON.stringify(textList(body.includesEn))}::jsonb,
+          meeting_point = ${String(body.meetingPoint || 'Kulino House, Banyuwangi').trim()},
+          published = ${body.published !== false}, updated_at = NOW()
       FROM tour_categories c
       WHERE p.id = ${id} AND c.id = ${categoryId}
       RETURNING p.*, c.name AS category_name
     `;
     if (!rows.length) return NextResponse.json({ error: 'Paket atau kategori tidak ditemukan.' }, { status: 404, headers: noStore });
-    const row = rows[0];
-    return NextResponse.json({ id: Number(row.id), name: row.name, price: Number(row.price), categoryId: Number(row.category_id), category: row.category_name, duration: row.duration }, { headers: noStore });
+    return NextResponse.json(tourRow(rows[0]), { headers: noStore });
   } catch (error) {
     console.error('PATCH /api/admin/tours/[id] error:', error);
     return NextResponse.json({ error: 'Paket tour gagal diperbarui.' }, { status: 500, headers: noStore });

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
-import { ensureAppDatabase, sql } from '@/lib/app-database';
+import { ensureAppDatabase, sql, tourRow } from '@/lib/app-database';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -9,16 +9,8 @@ function categoryRow(row) {
   return { id: Number(row.id), name: row.name };
 }
 
-function tourRow(row) {
-  return {
-    id: Number(row.id),
-    name: row.name,
-    price: Number(row.price),
-    categoryId: Number(row.category_id),
-    category: row.category_name,
-    duration: row.duration,
-  };
-}
+const textList = (value) => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+const slugify = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 async function loadTourData() {
   const [categories, tours] = await Promise.all([
@@ -65,16 +57,27 @@ export async function POST(request) {
     if (body.type === 'tour') {
       const name = String(body.name || '').trim();
       const duration = String(body.duration || '').trim();
+      const slug = slugify(body.slug || name);
       const price = Number(body.price);
       const categoryId = Number(body.categoryId);
-      if (!name || !duration || !Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(categoryId)) {
+      if (!name || !slug || !duration || !Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(categoryId)) {
         return NextResponse.json({ error: 'Nama, kategori, harga, dan durasi wajib valid.' }, { status: 400, headers: noStore });
       }
-      const existing = await sql`SELECT id FROM tour_packages WHERE LOWER(name) = LOWER(${name}) LIMIT 1`;
+      const existing = await sql`SELECT id FROM tour_packages WHERE LOWER(name) = LOWER(${name}) OR slug = ${slug} LIMIT 1`;
       if (existing.length) return NextResponse.json({ error: 'Paket tour dengan nama tersebut sudah ada.' }, { status: 409, headers: noStore });
       const rows = await sql`
-        INSERT INTO tour_packages (name, price, category_id, duration)
-        SELECT ${name}, ${price}, id, ${duration} FROM tour_categories WHERE id = ${categoryId}
+        INSERT INTO tour_packages (
+          name, slug, price, category_id, duration, distance, difficulty_id, difficulty_en,
+          description_id, description_en, image, image_public_id, includes_id, includes_en,
+          meeting_point, published
+        )
+        SELECT ${name}, ${slug}, ${price}, id, ${duration}, ${String(body.distance || '').trim()},
+          ${String(body.difficultyId || 'Mudah').trim()}, ${String(body.difficultyEn || 'Easy').trim()},
+          ${String(body.descriptionId || '').trim()}, ${String(body.descriptionEn || body.descriptionId || '').trim()},
+          ${String(body.image || '/images/hero-banner.png')}, ${body.imagePublicId || null},
+          ${JSON.stringify(textList(body.includesId))}::jsonb, ${JSON.stringify(textList(body.includesEn))}::jsonb,
+          ${String(body.meetingPoint || 'Kulino House, Banyuwangi').trim()}, ${body.published !== false}
+        FROM tour_categories WHERE id = ${categoryId}
         RETURNING *
       `;
       if (!rows.length) return NextResponse.json({ error: 'Kategori tour tidak ditemukan.' }, { status: 404, headers: noStore });

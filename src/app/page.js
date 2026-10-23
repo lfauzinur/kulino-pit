@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
-import { testimonials, tours, formatCurrency, getLowestPrice } from '@/lib/data';
-import { MapPin, Calendar, Search, Map, CreditCard, Briefcase, Plus, Users, User, Star, Flame } from 'lucide-react';
+import { testimonials, formatCurrency, getLowestPrice } from '@/lib/data';
+import { MapPin, Calendar, Search, Map, CreditCard, Briefcase, Plus, Users, User, Star, Flame, Play, X, Images } from 'lucide-react';
 import VisitorTracker from '@/components/VisitorTracker';
 
 /* ─── Hero Section ─── */
@@ -382,7 +382,7 @@ function RentalOptions({ t, locale }) {
 }
 
 /* ─── Popular Tours ─── */
-function PopularTours({ t, locale }) {
+function PopularTours({ t, locale, tours }) {
   return (
     <section className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -454,6 +454,38 @@ function PopularTours({ t, locale }) {
   );
 }
 
+/* ─── Gallery: landscape media with an in-page popup ─── */
+function GallerySection({ locale }) {
+  const [items, setItems] = useState([]);
+  const [active, setActive] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/gallery', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(setItems)
+      .catch(() => setItems([]));
+  }, []);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    const close = (event) => { if (event.key === 'Escape') setActive(null); };
+    document.addEventListener('keydown', close);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', close); document.body.style.overflow = ''; };
+  }, [active]);
+
+  if (!items.length) return null;
+  const isEmbed = (url) => /instagram\.com|tiktok\.com|youtube\.com|youtu\.be/.test(url || '');
+
+  return <section className="border-y border-gray-100 bg-gradient-to-b from-white to-blue-50/40 py-20">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs font-black uppercase tracking-[.22em] text-[var(--color-primary)]">{locale === 'id' ? 'Galeri Gowes' : 'Cycling Gallery'}</p><h2 className="mt-3 font-display text-3xl font-black text-gray-900 lg:text-4xl">{locale === 'id' ? 'Cerita Kulino Pit dalam foto & video' : 'Kulino Pit stories in photo & video'}</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-gray-500">{locale === 'id' ? 'Klik media untuk melihat foto atau memutar video langsung di halaman ini.' : 'Click any media to view photos or play videos without leaving this page.'}</p></div><Images className="hidden text-[var(--color-primary)] sm:block" size={34} /></div>
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{items.slice(0, 6).map((item) => <button key={item.id} type="button" onClick={() => setActive(item)} className="group overflow-hidden rounded-[26px] border border-blue-100 bg-white text-left shadow-[0_16px_45px_rgba(41,128,185,.10)] transition hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(41,128,185,.18)]"><div className="relative aspect-video overflow-hidden bg-slate-900"><Image src={item.thumbnailUrl || item.mediaUrl} alt={item.title} fill className="object-cover transition duration-500 group-hover:scale-105" unoptimized />{item.type === 'video' && <span className="absolute inset-0 m-auto grid h-14 w-14 place-items-center rounded-full bg-white/95 text-[var(--color-primary)] shadow-xl"><Play size={22} fill="currentColor" /></span>}<span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[9px] font-black uppercase tracking-wider text-blue-700">{item.type === 'video' ? 'Video' : 'Foto'}</span></div><div className="p-5"><h3 className="font-display text-lg font-black text-gray-900">{item.title}</h3><p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{item.caption}</p></div></button>)}</div>
+    </div>
+    {active && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 p-3 backdrop-blur-md sm:p-6" role="dialog" aria-modal="true" aria-label={active.title} onClick={() => setActive(null)}><div className="w-full max-w-5xl overflow-hidden rounded-[28px] bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-between border-b px-5 py-4"><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-[var(--color-primary)]">Kulino Pit Gallery</p><h3 className="font-display text-lg font-black text-gray-900">{active.title}</h3></div><button type="button" onClick={() => setActive(null)} className="grid h-10 w-10 place-items-center rounded-xl bg-gray-100 text-gray-600" aria-label="Tutup"><X size={19} /></button></div><div className="relative grid min-h-[240px] max-h-[76vh] place-items-center bg-slate-950">{active.type === 'video' ? (isEmbed(active.mediaUrl) ? <iframe src={active.mediaUrl} title={active.title} className="h-[70vh] min-h-[360px] w-full border-0" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen /> : <video src={active.mediaUrl} poster={active.thumbnailUrl} controls autoPlay playsInline className="max-h-[76vh] w-full bg-black object-contain" />) : <div className="relative h-[72vh] max-h-[760px] w-full"><Image src={active.mediaUrl} alt={active.title} fill className="object-contain" unoptimized /></div>}</div>{active.caption && <p className="px-5 py-4 text-center text-sm text-gray-500">{active.caption}</p>}</div></div>}
+  </section>;
+}
+
 /* ─── Testimonials Section ─── */
 function TestimonialSection({ t, locale }) {
   return (
@@ -477,7 +509,7 @@ function TestimonialSection({ t, locale }) {
                 ))}
               </div>
               <p className="text-sm text-gray-600 mb-6 flex-1 leading-relaxed">
-                "{testi.text[locale] || testi.text.en}"
+                &ldquo;{testi.text[locale] || testi.text.en}&rdquo;
               </p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">
@@ -543,6 +575,7 @@ function PartnersSection({ t, locale }) {
 export default function LandingPage() {
   const { t, locale } = useI18n();
   const [heroBikeImage, setHeroBikeImage] = useState('/images/bikes/roadbike.png');
+  const [tourItems, setTourItems] = useState([]);
 
   useEffect(() => {
     fetch('/api/bikes', { cache: 'no-store' })
@@ -554,6 +587,13 @@ export default function LandingPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    fetch('/api/tours', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(setTourItems)
+      .catch(() => setTourItems([]));
+  }, []);
+
   return (
     <div className="min-h-screen">
       <HeroSection t={t} locale={locale} heroBikeImage={heroBikeImage} />
@@ -561,7 +601,8 @@ export default function LandingPage() {
       <HowItWorks t={t} />
       <RentalOptions t={t} locale={locale} />
       <FeaturedBikes t={t} />
-      <PopularTours t={t} locale={locale} />
+      <PopularTours t={t} locale={locale} tours={tourItems} />
+      <GallerySection locale={locale} />
       <PartnersSection t={t} locale={locale} />
       <TestimonialSection t={t} locale={locale} />
       <VisitorTracker />

@@ -1,9 +1,8 @@
 'use client';
-import { use } from 'react';
-import { notFound } from 'next/navigation';
+import { use, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { tours, formatCurrency } from '@/lib/data';
+import { formatCurrency } from '@/lib/data';
 import { useI18n } from '@/lib/i18n';
 import { MapPin, Calendar, Clock, Map, CheckCircle2, Navigation, ShieldCheck, Camera, ChevronLeft } from 'lucide-react';
 
@@ -12,11 +11,19 @@ export default function TourDetail({ params }) {
   const { locale } = useI18n();
   // Handle Next.js cache where the param might still be named 'id' after folder rename
   const slugParam = unwrappedParams.slug || unwrappedParams.id;
-  const tour = tours.find(t => t.slug === slugParam);
-  
-  if (!tour) {
-    notFound();
-  }
+  const [tour, setTour] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/tours?slug=${encodeURIComponent(slugParam)}`, { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
+      .then(setTour)
+      .catch(() => setTour(null))
+      .finally(() => setLoading(false));
+  }, [slugParam]);
+
+  if (loading) return <div className="min-h-[60vh] py-40 text-center font-semibold text-gray-400">Memuat detail tour…</div>;
+  if (!tour) return <div className="min-h-[60vh] py-40 text-center"><h1 className="font-display text-3xl font-black">Tour tidak ditemukan</h1><Link href="/trip-tour" className="mt-5 inline-flex text-[var(--color-primary)]">Kembali ke daftar tour</Link></div>;
 
   // Placeholder gallery images
   const gallery = [
@@ -96,7 +103,7 @@ export default function TourDetail({ params }) {
                   <Navigation size={24} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-lg">Kulino House, Banyuwangi</h3>
+                  <h3 className="font-bold text-gray-900 text-lg">{tour.meetingPoint}</h3>
                   <p className="text-gray-500 mt-1">
                     {locale === 'id' 
                       ? 'Harap berkumpul 30 menit sebelum jadwal keberangkatan untuk briefing dan fitting sepeda.' 
