@@ -253,7 +253,7 @@ function Step3({ selectedAccessories, toggleAccessory, setSelectedAccessories, l
 }
 
 /* Step 4: Summary & Payment */
-function Step4({ selectedBike, rentalType, dates, pickupMethod, selectedAccessories, customerInfo, setCustomerInfo, t, locale }) {
+function Step4({ selectedBike, rentalType, dates, pickupMethod, selectedAccessories, customerInfo, setCustomerInfo, paymentMethods, t, locale }) {
   const durationLabel = rentalDurations.find(d => d.key === rentalType)?.label[locale] || 'Sehari';
   const unitPrice = selectedBike ? getPriceByDuration(selectedBike, rentalType) : 0;
   
@@ -304,16 +304,16 @@ function Step4({ selectedBike, rentalType, dates, pickupMethod, selectedAccessor
           <div className="pt-4 border-t border-gray-100">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-3">{t('booking.paymentMethod')}</label>
             <div className="grid grid-cols-2 gap-3">
-              {['QRIS', 'Bank Transfer', 'E-Wallet', 'Credit Card'].map(method => (
+              {paymentMethods.map(method => (
                 <button
-                  key={method}
-                  onClick={() => setCustomerInfo(p => ({ ...p, paymentMethod: method }))}
+                  key={method.id}
+                  onClick={() => setCustomerInfo(p => ({ ...p, paymentMethodId: method.id }))}
                   className={`py-3 px-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all
-                    ${customerInfo.paymentMethod === method 
+                    ${customerInfo.paymentMethodId === method.id
                       ? 'bg-blue-50 text-[var(--color-primary)] border-[var(--color-primary)] shadow-sm' 
                       : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
                 >
-                  {method}
+                  {method.name}
                 </button>
               ))}
             </div>
@@ -367,13 +367,14 @@ export default function BookingPage() {
   const [dates, setDates] = useState({ start: '', end: '' });
   const [pickupMethod, setPickupMethod] = useState('pickup');
   const [selectedAccessories, setSelectedAccessories] = useState([]);
-  const [customerInfo, setCustomerInfo] = useState({ paymentMethod: 'Bank Transfer' });
+  const [customerInfo, setCustomerInfo] = useState({ paymentMethodId: '' });
   const [showConfirm, setShowConfirm] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [bikesList, setBikesList] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [requestedBike, setRequestedBike] = useState(null);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   useEffect(() => {
     fetch('/api/bikes', { cache: 'no-store' })
@@ -390,6 +391,20 @@ export default function BookingPage() {
         if (requested?.available) setSelectedBike(requested);
       })
       .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/payment-methods', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Metode pembayaran gagal dimuat.');
+        return data;
+      })
+      .then((methods) => {
+        setPaymentMethods(methods);
+        setCustomerInfo((current) => ({ ...current, paymentMethodId: current.paymentMethodId || methods[0]?.id || '' }));
+      })
+      .catch((error) => setSubmitError(error.message));
   }, []);
 
   const steps = [t('booking.step1'), t('booking.step2'), t('booking.step3'), t('booking.step4')];
@@ -430,25 +445,11 @@ export default function BookingPage() {
   };
 
   const handleSubmit = async () => {
-    const unitPrice = selectedBike ? getPriceByDuration(selectedBike, rentalType) : 0;
     let quantity = 1;
     if (rentalType === 'day' && dates.start && dates.end) {
       quantity = Math.max(1, Math.ceil((new Date(dates.end) - new Date(dates.start)) / (1000 * 60 * 60 * 24)));
     }
-    const bikeTotal = unitPrice * quantity;
-    const accTotal = accessories.filter(a => selectedAccessories.includes(a.id)).reduce((s, a) => s + a.price, 0);
-    const deliveryFee = pickupMethod === 'delivery' ? 50000 : 0;
-    const grandTotal = bikeTotal + accTotal + deliveryFee;
-    
     const uniqueCode = Math.floor(Math.random() * 9) + 1;
-    const finalTotal = grandTotal + uniqueCode;
-    
-    const paymentSettings = JSON.parse(localStorage.getItem('paymentSettings')) || {
-      bankAccount: 'BCA 1234567890 a/n Kulino Pit',
-      qrisUrl: 'QRIS - scan from any app',
-      qrisImage: ''
-    };
-
     const durationLabel = rentalDurations.find(d => d.key === rentalType)?.shortLabel || 'Sehari';
 
     let durationMinutes = 0;
@@ -478,7 +479,7 @@ export default function BookingPage() {
           pickupMethod,
           deliveryAddress: customerInfo.address,
           accessories: selectedAccessories,
-          paymentMethod: customerInfo.paymentMethod || 'Bank Transfer',
+          paymentMethodId: customerInfo.paymentMethodId,
           uniqueCode,
         }),
       });
@@ -489,10 +490,10 @@ export default function BookingPage() {
       localStorage.setItem('memberBookings', JSON.stringify([memberBooking, ...existingHistory]));
       setPaymentDetails({
         id: newBooking.id,
-        finalTotal,
+        finalTotal: newBooking.total,
         uniqueCode,
-        method: customerInfo.paymentMethod || 'Bank Transfer',
-        settings: paymentSettings
+        method: newBooking.paymentMethod,
+        methodDetails: newBooking.paymentMethodDetails,
       });
       setShowConfirm(true);
     } catch (requestError) {
@@ -541,27 +542,27 @@ export default function BookingPage() {
                   {locale === 'id' ? 'Metode Pembayaran' : 'Payment Method'}
                 </p>
                 
-                {paymentDetails.method.includes('QRIS') ? (
+                {paymentDetails.methodDetails?.type === 'qris' ? (
                   <div className="bg-white p-6 rounded-xl border border-gray-200 text-center shadow-sm">
                     <p className="font-bold text-sm text-gray-900 mb-4">{paymentDetails.method}</p>
-                    {paymentDetails.settings.qrisImage ? (
-                      <div className="bg-white p-2 border border-gray-100 inline-block rounded-xl shadow-sm mb-4">
-                        <img src={paymentDetails.settings.qrisImage} alt="QRIS Code" className="w-48 h-48 object-cover rounded-lg" />
+                    {paymentDetails.methodDetails?.imageUrl ? (
+                      <div className="relative mx-auto mb-4 h-48 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white p-2 shadow-sm">
+                        <Image src={paymentDetails.methodDetails.imageUrl} alt="QRIS Code" fill className="object-contain p-2" unoptimized />
                       </div>
                     ) : (
                       <div className="bg-gray-50 w-48 h-48 mx-auto mb-4 flex items-center justify-center border border-dashed border-gray-300 rounded-xl text-gray-400 text-xs">
                         QRIS Image Not Set
                       </div>
                     )}
-                    <p className="text-sm font-medium text-gray-600">{paymentDetails.settings.qrisUrl}</p>
+                    <p className="text-sm font-medium text-gray-600">{paymentDetails.methodDetails?.instructions}</p>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                     <div>
-                      <p className="font-bold text-sm text-gray-900">{paymentDetails.method}</p>
-                      <p className="text-sm font-medium text-gray-600 mt-1">{paymentDetails.settings.bankAccount}</p>
+                      <p className="font-bold text-sm text-gray-900">{paymentDetails.methodDetails?.provider} · {paymentDetails.methodDetails?.accountNumber}</p>
+                      <p className="text-sm font-medium text-gray-600 mt-1">a/n {paymentDetails.methodDetails?.accountHolder}</p>
                     </div>
-                    <button onClick={() => handleCopy(paymentDetails.settings.bankAccount.replace(/[^0-9]/g, ''))} className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
+                    <button onClick={() => handleCopy(paymentDetails.methodDetails?.accountNumber || '')} className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
                       Copy No. Rek
                     </button>
                   </div>
@@ -594,7 +595,7 @@ export default function BookingPage() {
           {step === 0 && <Step1 bikesList={bikesList} selected={selectedBike} onSelect={chooseBike} locale={locale} t={t} requestedBike={requestedBike} />}
           {step === 1 && <Step2 selectedBike={selectedBike} rentalType={rentalType} setRentalType={setRentalType} dates={dates} setDates={setDates} pickupMethod={pickupMethod} setPickupMethod={setPickupMethod} t={t} locale={locale} />}
           {step === 2 && <Step3 selectedAccessories={selectedAccessories} toggleAccessory={toggleAccessory} setSelectedAccessories={setSelectedAccessories} locale={locale} t={t} />}
-          {step === 3 && <Step4 selectedBike={selectedBike} rentalType={rentalType} dates={dates} pickupMethod={pickupMethod} selectedAccessories={selectedAccessories} customerInfo={customerInfo} setCustomerInfo={setCustomerInfo} t={t} locale={locale} />}
+          {step === 3 && <Step4 selectedBike={selectedBike} rentalType={rentalType} dates={dates} pickupMethod={pickupMethod} selectedAccessories={selectedAccessories} customerInfo={customerInfo} setCustomerInfo={setCustomerInfo} paymentMethods={paymentMethods} t={t} locale={locale} />}
           {submitError && <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{submitError}</p>}
 
           {/* Navigation */}

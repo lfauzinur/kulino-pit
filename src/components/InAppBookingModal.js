@@ -1,7 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { QRCodeSVG } from 'qrcode.react';
 import { 
   X, Clock, Calendar, Store, Truck, CheckCircle2, CreditCard, 
   Sparkles, ShieldCheck, Copy, ArrowRight, Check, HardHat, Lightbulb, 
@@ -24,13 +23,33 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
   const [startTime, setStartTime] = useState('06:30');
   const [pickupMethod, setPickupMethod] = useState(initialDraft?.pickupMethod || 'pickup');
   const [selectedAccessories, setSelectedAccessories] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState('QRIS');
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [bookingResult, setBookingResult] = useState(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [uniqueCode] = useState(10);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/payment-methods', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Metode pembayaran gagal dimuat.');
+        return data;
+      })
+      .then((methods) => {
+        if (cancelled) return;
+        setPaymentMethods(methods);
+        setPaymentMethodId((current) => current || methods[0]?.id || '');
+      })
+      .catch((error) => { if (!cancelled) setSubmitError(error.message); })
+      .finally(() => { if (!cancelled) setPaymentLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   if (!bike) return null;
 
@@ -80,7 +99,7 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
           durationMinutes,
           pickupMethod,
           accessories: selectedAccessories,
-          paymentMethod,
+          paymentMethodId,
           uniqueCode,
         }),
       });
@@ -100,13 +119,15 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
     }
   };
 
-  const handleCopyText = (text) => {
+  const handleCopyText = (text, key) => {
     if (typeof navigator !== 'undefined') {
       navigator.clipboard?.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopied(key);
+      setTimeout(() => setCopied(''), 2000);
     }
   };
+
+  const selectedPaymentMethod = paymentMethods.find((method) => method.id === paymentMethodId);
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
@@ -172,11 +193,14 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
                   <span className="text-gray-500">Metode Bayar</span>
                   <span className="font-bold text-gray-800">{bookingResult.paymentMethod}</span>
                 </div>
-                <div className="flex justify-between items-center pt-2.5 border-t border-gray-200 text-sm">
+                <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-gray-200 text-sm">
                   <span className="font-bold text-gray-700">Total Pembayaran</span>
-                  <span className="font-display font-black text-base text-[var(--color-primary)]">
-                    {formatCurrency(bookingResult.total)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-display font-black text-base text-[var(--color-primary)]">{formatCurrency(bookingResult.total)}</span>
+                    <button type="button" onClick={() => handleCopyText(String(bookingResult.total), 'total')} className="btn flex items-center gap-1 bg-blue-100 px-2.5 py-1.5 text-[10px] font-bold text-blue-700 hover:bg-blue-200" aria-label="Salin total pembayaran">
+                      <Copy size={12} /> {copied === 'total' ? 'Tersalin!' : 'Salin Total'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -186,45 +210,33 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
                   Info Pembayaran ({bookingResult.paymentMethod})
                 </p>
 
-                {bookingResult.paymentMethod === 'QRIS' ? (
+                {bookingResult.paymentMethodDetails?.type === 'qris' ? (
                   <div className="flex flex-col items-center gap-3">
-                    <div className="bg-white p-3 rounded-2xl border border-sky-100 shadow-sm inline-block">
-                      <QRCodeSVG
-                        value={`kulino-pit://pay?booking=${bookingResult.id}&amount=${bookingResult.total}`}
-                        size={140}
-                        bgColor="#ffffff"
-                        fgColor="#0f172a"
-                        level="M"
-                      />
-                    </div>
+                    {bookingResult.paymentMethodDetails.imageUrl && <div className="relative h-44 w-44 overflow-hidden rounded-2xl border border-sky-100 bg-white p-3 shadow-sm"><Image src={bookingResult.paymentMethodDetails.imageUrl} alt={`QRIS ${bookingResult.paymentMethod}`} fill className="object-contain p-3" unoptimized /></div>}
                     <div className="text-center">
-                      <p className="text-xs font-bold text-gray-800">Scan QRIS Kulino Pit</p>
+                      <p className="text-xs font-bold text-gray-800">{bookingResult.paymentMethod}</p>
                       <p className="text-[10px] text-gray-500">Bayar tepat <strong>{formatCurrency(bookingResult.total)}</strong></p>
                     </div>
-                    <button
-                      onClick={() => handleCopyText(bookingResult.total.toString())}
-                      className="btn px-4 py-1.5 text-[10px] font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 flex items-center gap-1"
-                    >
-                      <Copy size={12} /> {copied ? 'Tersalin!' : 'Salin Nominal'}
-                    </button>
+                    {bookingResult.paymentMethodDetails.instructions && <p className="text-center text-[10px] leading-4 text-gray-500">{bookingResult.paymentMethodDetails.instructions}</p>}
                   </div>
                 ) : (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-sky-200">
                       <div>
-                        <p className="text-xs font-bold text-gray-800">BCA 1800-8899-22</p>
-                        <p className="text-[10px] text-gray-500">a/n Kulino House Banyuwangi</p>
+                        <p className="text-xs font-bold text-gray-800">{bookingResult.paymentMethodDetails?.provider} {bookingResult.paymentMethodDetails?.accountNumber}</p>
+                        <p className="text-[10px] text-gray-500">a/n {bookingResult.paymentMethodDetails?.accountHolder}</p>
                       </div>
                       <button
-                        onClick={() => handleCopyText('1800889922')}
+                        onClick={() => handleCopyText(bookingResult.paymentMethodDetails?.accountNumber || '', 'account')}
                         className="btn px-3 py-1.5 text-[10px] font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 flex items-center gap-1"
                       >
-                        <Copy size={12} /> {copied ? 'OK!' : 'Salin'}
+                        <Copy size={12} /> {copied === 'account' ? 'Tersalin!' : 'Salin No. Rek'}
                       </button>
                     </div>
                     <p className="text-[10px] text-gray-500 text-center">
                       Transfer tepat <strong className="text-gray-800">{formatCurrency(bookingResult.total)}</strong> (kode unik sudah termasuk)
                     </p>
+                    {bookingResult.paymentMethodDetails?.instructions && <p className="text-center text-[10px] leading-4 text-gray-500">{bookingResult.paymentMethodDetails.instructions}</p>}
                   </div>
                 )}
               </div>
@@ -414,39 +426,25 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
                 </div>
               </div>
 
-              {/* STEP 4: METODE PEMBAYARAN — QRIS & Transfer saja */}
+              {/* STEP 4: METODE PEMBAYARAN — bersumber dari Dashboard Admin */}
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                   4. METODE PEMBAYARAN
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('QRIS')}
-                    className={`py-3 px-3 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 ${
-                      paymentMethod === 'QRIS'
-                        ? 'bg-sky-50 border-[var(--color-primary)] text-[var(--color-primary)] shadow-sm'
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <QrCode size={20} />
-                    <span className="text-xs font-bold">QRIS</span>
-                    <span className="text-[9px] text-gray-400">Scan bayar instan</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('Transfer Bank')}
-                    className={`py-3 px-3 rounded-2xl border text-center transition-all flex flex-col items-center gap-1.5 ${
-                      paymentMethod === 'Transfer Bank'
-                        ? 'bg-sky-50 border-[var(--color-primary)] text-[var(--color-primary)] shadow-sm'
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Banknote size={20} />
-                    <span className="text-xs font-bold">Transfer Bank</span>
-                    <span className="text-[9px] text-gray-400">BCA / Mandiri / BRI</span>
-                  </button>
-                </div>
+                {paymentLoading ? <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-center text-xs text-gray-500">Memuat metode pembayaran…</div> : paymentMethods.length ? <div className="grid grid-cols-2 gap-3">
+                  {paymentMethods.map((method) => (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => setPaymentMethodId(method.id)}
+                      className={`flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-3 text-center transition-all ${paymentMethodId === method.id ? 'border-[var(--color-primary)] bg-sky-50 text-[var(--color-primary)] shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      {method.type === 'qris' ? <QrCode size={20} /> : <Banknote size={20} />}
+                      <span className="text-xs font-bold">{method.name}</span>
+                      <span className="text-[9px] text-gray-400">{method.type === 'qris' ? 'Scan bayar instan' : method.provider}</span>
+                    </button>
+                  ))}
+                </div> : <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-center text-xs font-semibold text-red-700">Belum ada metode pembayaran aktif.</div>}
               </div>
 
               {/* TOTAL RINGKASAN & SUBMIT BUTTON */}
@@ -466,7 +464,7 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
                 {submitError && <p className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">{submitError}</p>}
                 <button
                   onClick={handleConfirmBooking}
-                  disabled={submitting || !selectedDate}
+                  disabled={submitting || !selectedDate || !selectedPaymentMethod}
                   className="btn btn-primary w-full py-3.5 text-sm font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <CreditCard size={16} /> {submitting ? 'Menyimpan…' : 'Konfirmasi & Sewa Sekarang'}

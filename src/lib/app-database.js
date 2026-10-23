@@ -66,6 +66,8 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method_id TEXT DEFAULT ''`;
+
       await sql`ALTER TABLE partner_applications ADD COLUMN IF NOT EXISTS photo_public_id TEXT`;
 
       await sql`
@@ -339,6 +341,7 @@ export function bookingRow(row) {
     days: Math.max(1, Math.ceil((row.duration_minutes || 1440) / 1440)),
     pickupMethod: row.pickup_method,
     paymentMethod: row.payment_method,
+    paymentMethodId: row.payment_method_id || '',
     total: row.total_amount,
     status: row.status,
     activeSince: row.active_since ? new Date(row.active_since).getTime() : null,

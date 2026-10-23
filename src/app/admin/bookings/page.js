@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { formatCurrency } from '@/lib/data';
-import { CalendarDays, Search, Filter, ChevronDown, Settings, X, Save } from 'lucide-react';
+import { CalendarDays, Search, Filter, ChevronDown, Settings, X } from 'lucide-react';
 
 export default function AdminBookingsPage() {
   const [filter, setFilter] = useState('All');
@@ -46,36 +47,6 @@ export default function AdminBookingsPage() {
     Promise.resolve().then(() => loadBookings());
   }, [loadBookings]);
 
-  // Payment Settings Modal
-  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
-  const [paymentSettings, setPaymentSettings] = useState({
-    bankAccount: 'BCA 1234567890 a/n Kulino Pit',
-    qrisUrl: 'QRIS - scan from any app',
-    qrisImage: ''
-  });
-
-  useEffect(() => {
-    const saved = localStorage.getItem('paymentSettings');
-    if (saved) Promise.resolve().then(() => setPaymentSettings(JSON.parse(saved)));
-  }, []);
-
-  const handleSavePaymentSettings = () => {
-    localStorage.setItem('paymentSettings', JSON.stringify(paymentSettings));
-    alert('Payment settings saved successfully!');
-    setShowPaymentSettings(false);
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPaymentSettings(prev => ({ ...prev, qrisImage: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleUpdateStatus = async (id, newStatus) => {
     setUpdatingId(id);
     setError('');
@@ -117,12 +88,12 @@ export default function AdminBookingsPage() {
           <p className="text-sm text-gray-500 mt-1">Manage all incoming and ongoing bike rentals.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setShowPaymentSettings(true)}
+          <Link
+            href="/admin/payments"
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-sm font-semibold rounded-xl text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
           >
-            <Settings size={16} /> Setup Payment
-          </button>
+            <Settings size={16} /> Kelola Pembayaran
+          </Link>
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input 
@@ -138,64 +109,6 @@ export default function AdminBookingsPage() {
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
       {success && <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">{success}</div>}
-
-      {/* Payment Settings Modal */}
-      {showPaymentSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-display font-black text-xl text-gray-900">Payment Methods Setup</h3>
-              <button onClick={() => setShowPaymentSettings(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 text-gray-500">
-                <X size={16} />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Bank Account (e.g. BCA 1234567890 a/n Name)</label>
-                <input 
-                  type="text" 
-                  value={paymentSettings.bankAccount}
-                  onChange={e => setPaymentSettings({...paymentSettings, bankAccount: e.target.value})}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">QRIS Instructions / Link</label>
-                <input 
-                  type="text" 
-                  value={paymentSettings.qrisUrl}
-                  onChange={e => setPaymentSettings({...paymentSettings, qrisUrl: e.target.value})}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)] mb-3"
-                />
-                
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Upload QRIS Image</label>
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--color-primary)] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                {paymentSettings.qrisImage && (
-                  <div className="mt-4 p-2 border border-gray-200 rounded-xl bg-gray-50 text-center">
-                    <img src={paymentSettings.qrisImage} alt="QRIS Preview" className="mx-auto max-h-40 rounded-lg shadow-sm" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-8 flex justify-end gap-3">
-              <button onClick={() => setShowPaymentSettings(false)} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl">
-                Cancel
-              </button>
-              <button onClick={handleSavePaymentSettings} className="px-5 py-2.5 text-sm font-semibold text-white bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] rounded-xl flex items-center gap-2">
-                <Save size={16} /> Save Settings
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">

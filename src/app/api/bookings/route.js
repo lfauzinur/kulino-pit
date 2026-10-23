@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { bookingRow, ensureAppDatabase, sql } from '@/lib/app-database';
+import { readPaymentMethods } from '@/lib/payment-methods';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -65,13 +66,20 @@ export async function POST(request) {
     const deliveryFee = body.pickupMethod === 'delivery' ? 50000 : 0;
     const uniqueCode = Math.min(99, Math.max(0, Number(body.uniqueCode) || 0));
     const totalAmount = (Number(prices[durationKey]) * quantity) + accessoryTotal + deliveryFee + uniqueCode;
+    const paymentMethods = await readPaymentMethods({ activeOnly: true });
+    const selectedPaymentMethod = paymentMethods.find((method) => method.id === String(body.paymentMethodId || ''))
+      || paymentMethods.find((method) => method.name === String(body.paymentMethod || ''))
+      || paymentMethods[0];
+    if (!selectedPaymentMethod) {
+      return NextResponse.json({ error: 'Belum ada metode pembayaran aktif. Hubungi admin.' }, { status: 409 });
+    }
 
     const code = `KP-${Date.now().toString().slice(-9)}`;
     const rows = await sql`
       INSERT INTO bookings (
         booking_code, customer_name, customer_phone, customer_email, customer_id_number,
         bike_id, bike_name, rental_date, start_time, duration_key, duration_label,
-        duration_minutes, pickup_method, delivery_address, accessories, payment_method,
+        duration_minutes, pickup_method, delivery_address, accessories, payment_method, payment_method_id,
         total_amount, status, active_since
       ) VALUES (
         ${code}, ${customerName}, ${String(body.customerPhone || '').trim()},
@@ -81,11 +89,11 @@ export async function POST(request) {
         ${String(body.durationLabel || '')}, ${Math.round(durationMinutes)},
         ${body.pickupMethod === 'delivery' ? 'delivery' : 'pickup'},
         ${String(body.deliveryAddress || '')}, ${JSON.stringify(selectedAccessories)}::jsonb,
-        ${String(body.paymentMethod || '')}, ${Math.round(totalAmount)}, 'Pending', NULL
+        ${selectedPaymentMethod.name}, ${selectedPaymentMethod.id}, ${Math.round(totalAmount)}, 'Pending', NULL
       ) RETURNING *
     `;
 
-    return NextResponse.json(bookingRow(rows[0]), { status: 201 });
+    return NextResponse.json({ ...bookingRow(rows[0]), paymentMethodDetails: selectedPaymentMethod }, { status: 201 });
   } catch (error) {
     console.error('POST /api/bookings error:', error);
     return NextResponse.json({ error: 'Booking gagal disimpan.' }, { status: 500 });
