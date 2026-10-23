@@ -33,13 +33,14 @@ export async function POST(request) {
     const social = type === 'video' ? await resolveSocialMedia(mediaUrl) : null;
     const provider = social?.provider || 'upload';
     const embedUrl = social?.embedUrl || '';
+    const playbackUrl = social?.playbackUrl || '';
     const aspectRatio = social?.aspectRatio || String(body.aspectRatio || (type === 'photo' ? '4 / 3' : '16 / 9'));
     const thumbnailUrl = social?.thumbnailUrl || String(body.thumbnailUrl || (type === 'photo' ? mediaUrl : ''));
     const rows = await sql`
-      INSERT INTO gallery_items (title, media_type, media_url, media_public_id, thumbnail_url, thumbnail_public_id, caption, sort_order, published, provider, embed_url, aspect_ratio)
+      INSERT INTO gallery_items (title, media_type, media_url, media_public_id, thumbnail_url, thumbnail_public_id, caption, sort_order, published, provider, embed_url, playback_url, aspect_ratio)
       VALUES (${title}, ${type}, ${social?.sourceUrl || mediaUrl}, ${body.mediaPublicId || null}, ${thumbnailUrl},
         ${body.thumbnailPublicId || null}, ${String(body.caption || '').trim()},
-        ${Number.isFinite(Number(body.sortOrder)) ? Math.round(Number(body.sortOrder)) : 0}, ${body.published !== false}, ${provider}, ${embedUrl}, ${aspectRatio})
+        ${Number.isFinite(Number(body.sortOrder)) ? Math.round(Number(body.sortOrder)) : 0}, ${body.published !== false}, ${provider}, ${embedUrl}, ${playbackUrl}, ${aspectRatio})
       RETURNING *
     `;
     return NextResponse.json(galleryRow(rows[0]), { status: 201, headers: noStore });

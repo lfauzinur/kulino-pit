@@ -26,11 +26,11 @@ export default function Navbar() {
     <>
       <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md z-50 border-b border-gray-100 shadow-sm transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex h-16 items-center justify-between sm:h-20">
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="flex items-center gap-3 group">
-                <div className="relative w-11 h-11 transition-transform group-hover:scale-105">
+                <div className="relative h-10 w-10 transition-transform group-hover:scale-105 sm:h-11 sm:w-11">
                   <Image 
                     src="/images/logo.png" 
                     alt="Kulino Ngepit Logo" 
@@ -89,6 +89,8 @@ export default function Navbar() {
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
                 className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                aria-label={mobileOpen ? 'Tutup menu' : 'Buka menu'}
+                aria-expanded={mobileOpen}
               >
                 <div className="w-6 h-5 flex flex-col justify-between">
                   <span className={`w-full h-0.5 bg-current transform transition-all ${mobileOpen ? 'rotate-45 translate-y-2' : ''}`} />
@@ -101,7 +103,7 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Menu Panel */}
-        <div className={`xl:hidden absolute top-20 left-0 w-full bg-white border-b border-gray-100 shadow-lg transition-all duration-300 ${mobileOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
+        <div className={`absolute left-0 top-16 max-h-[calc(100vh-4rem)] w-full overflow-y-auto border-b border-gray-100 bg-white shadow-lg transition-all duration-300 sm:top-20 sm:max-h-[calc(100vh-5rem)] xl:hidden ${mobileOpen ? 'visible opacity-100' : 'invisible opacity-0'}`}>
           <div className="px-4 pt-2 pb-6 space-y-2">
             {links.map((link) => (
               <Link

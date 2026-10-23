@@ -19,6 +19,7 @@ export async function PATCH(request, { params }) {
     const social = type === 'video' ? await resolveSocialMedia(mediaUrl) : null;
     const provider = social?.provider || 'upload';
     const embedUrl = social?.embedUrl || '';
+    const playbackUrl = social?.playbackUrl || '';
     const aspectRatio = social?.aspectRatio || String(body.aspectRatio || (type === 'photo' ? '4 / 3' : '16 / 9'));
     const thumbnailUrl = social?.thumbnailUrl || String(body.thumbnailUrl || (type === 'photo' ? mediaUrl : ''));
     const rows = await sql`
@@ -26,7 +27,7 @@ export async function PATCH(request, { params }) {
         media_public_id = ${body.mediaPublicId || null}, thumbnail_url = ${thumbnailUrl},
         thumbnail_public_id = ${body.thumbnailPublicId || null}, caption = ${String(body.caption || '').trim()},
         sort_order = ${Number.isFinite(Number(body.sortOrder)) ? Math.round(Number(body.sortOrder)) : 0},
-        published = ${body.published !== false}, provider = ${provider}, embed_url = ${embedUrl}, aspect_ratio = ${aspectRatio}, updated_at = NOW()
+        published = ${body.published !== false}, provider = ${provider}, embed_url = ${embedUrl}, playback_url = ${playbackUrl}, aspect_ratio = ${aspectRatio}, updated_at = NOW()
       WHERE id = ${id} RETURNING *
     `;
     if (!rows.length) return NextResponse.json({ error: 'Item galeri tidak ditemukan.' }, { status: 404, headers: noStore });

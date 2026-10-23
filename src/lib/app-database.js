@@ -178,17 +178,18 @@ export function ensureAppDatabase() {
       `;
       await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'upload'`;
       await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS embed_url TEXT NOT NULL DEFAULT ''`;
+      await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS playback_url TEXT NOT NULL DEFAULT ''`;
       await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS aspect_ratio TEXT NOT NULL DEFAULT '16 / 9'`;
       const legacySocialItems = await sql`
         SELECT id, media_url FROM gallery_items
-        WHERE media_type = 'video' AND provider = 'upload'
+        WHERE media_type = 'video' AND (provider = 'upload' OR (provider = 'instagram' AND playback_url = ''))
           AND (media_url ILIKE '%youtube.com/%' OR media_url ILIKE '%youtu.be/%' OR media_url ILIKE '%instagram.com/%' OR media_url ILIKE '%tiktok.com/%')
       `;
       for (const item of legacySocialItems) {
         const social = await resolveSocialMedia(item.media_url);
         if (social) {
           await sql`
-            UPDATE gallery_items SET provider = ${social.provider}, embed_url = ${social.embedUrl},
+            UPDATE gallery_items SET provider = ${social.provider}, embed_url = ${social.embedUrl}, playback_url = ${social.playbackUrl || ''},
               thumbnail_url = ${social.thumbnailUrl}, aspect_ratio = ${social.aspectRatio}, updated_at = NOW()
             WHERE id = ${item.id}
           `;
@@ -474,6 +475,7 @@ export function galleryRow(row) {
     mediaUrl: row.media_url,
     provider: row.provider || 'upload',
     embedUrl: row.embed_url || '',
+    playbackUrl: row.playback_url || '',
     aspectRatio: row.aspect_ratio || '16 / 9',
     mediaPublicId: row.media_public_id,
     thumbnailUrl: row.thumbnail_url || (row.media_type === 'photo' ? row.media_url : ''),

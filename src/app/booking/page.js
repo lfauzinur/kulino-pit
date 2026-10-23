@@ -46,14 +46,14 @@ function Step1({ bikesList, selected, onSelect, locale, t, requestedBike }) {
         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center"><div><p className={`text-sm font-black ${requestedBike.available ? 'text-green-800' : 'text-red-700'}`}>{requestedBike.name}</p><p className="mt-1 text-xs text-gray-600">{requestedBike.available ? `${requestedBike.availableStock} dari ${requestedBike.stockCount} unit tersedia dan siap dipesan.` : `Stok sedang kosong (${requestedBike.rentedCount}/${requestedBike.stockCount} unit dipakai atau unit dinonaktifkan). Silakan pilih unit lain di bawah.`}</p></div><span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black ${requestedBike.available ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{requestedBike.available ? 'TERSEDIA' : 'KOSONG'}</span></div>
       </div>}
       <p className="mb-4 text-sm font-semibold text-gray-500">{requestedBike?.available ? 'Unit pilihan Anda sudah tersedia. Anda dapat lanjut atau memilih model lain.' : 'Pilih sepeda yang tersedia:'}</p>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {available.map(bike => {
           const lowestPrice = getLowestPrice(bike);
           return (
             <button
               key={bike.id}
               onClick={() => onSelect(bike)}
-              className={`bg-white rounded-3xl p-5 text-left flex gap-5 items-center transition-all border relative
+              className={`relative grid min-w-0 grid-cols-[84px_minmax(0,1fr)] items-center gap-3 rounded-3xl border bg-white p-4 text-left transition-all sm:grid-cols-[96px_minmax(0,1fr)] sm:gap-5 sm:p-5
                 ${selected?.id === bike.id ? 'border-[var(--color-primary)] shadow-md bg-blue-50/30' : 'border-gray-100 shadow-sm hover:shadow-md'}`}
             >
               {bike.popular && (
@@ -61,17 +61,17 @@ function Step1({ bikesList, selected, onSelect, locale, t, requestedBike }) {
                   <Flame size={10} /> Popular
                 </span>
               )}
-              <div className="relative w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 shrink-0 overflow-hidden flex items-center justify-center">
+              <div className="relative h-[84px] w-[84px] overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 sm:h-24 sm:w-24">
                 <Image src={bike.image} alt={bike.name} fill className="object-contain p-2 drop-shadow-md" unoptimized />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-display font-black text-lg text-gray-900">{bike.name}</p>
+                <p className={`font-display text-base font-black leading-tight text-gray-900 sm:text-lg ${bike.popular ? 'pr-16 sm:pr-20' : ''}`}>{bike.name}</p>
                 <p className="text-[10px] text-gray-500 mt-1 line-clamp-2">{bike.description[locale]}</p>
-                <div className="flex items-center justify-between gap-2 mt-3">
-                  <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider">
+                <div className="mt-3 flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <span className="max-w-full truncate rounded-lg bg-gray-100 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-gray-600">
                     {t(`bikes.categories.${bike.category}`)}
                   </span>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <span className="mb-0.5 block text-[9px] font-bold text-green-600">{bike.availableStock} unit tersedia</span>
                     <span className="text-[9px] text-gray-400 block">{locale === 'id' ? 'Mulai' : 'From'}</span>
                     <span className="font-display font-black text-sm text-[var(--color-primary)]">{formatCurrency(lowestPrice)}</span>

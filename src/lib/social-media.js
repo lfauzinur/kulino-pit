@@ -33,7 +33,8 @@ export async function resolveSocialMedia(value) {
     return {
       provider: 'youtube',
       sourceUrl: url.toString(),
-      embedUrl: `https://www.youtube.com/embed/${id}?rel=0`,
+      embedUrl: `https://www.youtube.com/embed/${id}?rel=0&playsinline=1&controls=1`,
+      playbackUrl: '',
       thumbnailUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
       aspectRatio: '16 / 9',
     };
@@ -46,8 +47,9 @@ export async function resolveSocialMedia(value) {
     return {
       provider: 'instagram',
       sourceUrl: `https://www.instagram.com/${type}/${shortcode}/`,
-      embedUrl: `https://www.instagram.com/${type}/${shortcode}/embed/`,
-      thumbnailUrl: '',
+      embedUrl: '',
+      playbackUrl: `/api/social-media/instagram/${type}/${shortcode}`,
+      thumbnailUrl: `/api/social-media/instagram/${type}/${shortcode}?asset=thumbnail`,
       aspectRatio: type === 'p' ? '1 / 1' : '9 / 16',
     };
   }
@@ -64,7 +66,8 @@ export async function resolveSocialMedia(value) {
     const result = {
       provider: 'tiktok',
       sourceUrl: url.toString(),
-      embedUrl: `https://www.tiktok.com/player/v1/${match[1]}`,
+      embedUrl: `https://www.tiktok.com/player/v1/${match[1]}?controls=1&description=0&music_info=0&rel=0&native_context_menu=0`,
+      playbackUrl: '',
       thumbnailUrl: '',
       aspectRatio: '9 / 16',
     };
@@ -82,4 +85,45 @@ export async function resolveSocialMedia(value) {
   }
 
   return null;
+}
+
+const INSTAGRAM_TYPES = new Set(['reel', 'p', 'tv']);
+const INSTAGRAM_ASSET_HOSTS = ['.fbcdn.net', '.cdninstagram.com'];
+
+function extractInstagramUrl(html, key) {
+  const markers = [`${key}\\\":\\\"`, `\"${key}\":\"`];
+  for (const marker of markers) {
+    const markerIndex = html.indexOf(marker);
+    if (markerIndex < 0) continue;
+    const start = markerIndex + marker.length;
+    const escapedEnd = html.indexOf('\\\"', start);
+    const plainEnd = html.indexOf('\"', start);
+    const end = escapedEnd >= 0 ? escapedEnd : plainEnd;
+    if (end <= start) continue;
+    const decoded = html.slice(start, end)
+      .replace(/\\u0026/g, '&')
+      .replace(/\\+\//g, '/')
+      .replace(/&amp;/g, '&');
+    try {
+      const url = new URL(decoded);
+      const hostname = url.hostname.toLowerCase();
+      if (url.protocol === 'https:' && INSTAGRAM_ASSET_HOSTS.some((suffix) => hostname.endsWith(suffix))) return url.toString();
+    } catch { /* try the next marker */ }
+  }
+  return '';
+}
+
+export async function resolveInstagramAsset(type, shortcode, asset = 'video') {
+  if (!INSTAGRAM_TYPES.has(type) || !/^[a-zA-Z0-9_-]+$/.test(shortcode)) return '';
+  const response = await fetch(`https://www.instagram.com/${type}/${shortcode}/embed/`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; KulinoPit/1.0)' },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(8000),
+    next: { revalidate: 300 },
+  });
+  if (!response.ok) return '';
+  const html = await response.text();
+  return asset === 'thumbnail'
+    ? extractInstagramUrl(html, 'thumbnail_src') || extractInstagramUrl(html, 'display_url')
+    : extractInstagramUrl(html, 'video_url');
 }

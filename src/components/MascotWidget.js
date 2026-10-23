@@ -3,31 +3,29 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
+const GREETINGS = [
+  'Hei Goweser! 🚴 Mau sewa sepeda hari ini?',
+  'Yuk gowes keliling Banyuwangi! 🌴',
+  'Ada promo spesial weekend nih! 🎉',
+  'Daftar member & kumpulkan poin! ⭐',
+  'Trip ke Ijen? Ayo bareng Kulino! ⛰️',
+  'Sepeda santai atau road bike? Pilih dulu! 🚲',
+];
+
 export default function MascotWidget() {
   const [showBubble, setShowBubble] = useState(false);
   const [bubbleText, setBubbleText] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
 
   // Hanya tampilkan di halaman publik, bukan di /member, /admin, /partner
-  const hiddenPaths = ['/member', '/admin', '/partner'];
+  const hiddenPaths = ['/member', '/admin', '/partner', '/booking', '/unit-sepeda'];
   const shouldHide = hiddenPaths.some(p => pathname?.startsWith(p));
 
-  const greetings = [
-    'Hei Goweser! 🚴 Mau sewa sepeda hari ini?',
-    'Yuk gowes keliling Banyuwangi! 🌴',
-    'Ada promo spesial weekend nih! 🎉',
-    'Daftar member & kumpulkan poin! ⭐',
-    'Trip ke Ijen? Ayo bareng Kulino! ⛰️',
-    'Sepeda santai atau road bike? Pilih dulu! 🚲',
-  ];
-
   useEffect(() => {
-    setIsMounted(true);
     // Tampilkan bubble setelah 2 detik
     const timer = setTimeout(() => {
-      const idx = Math.floor(Math.random() * greetings.length);
-      setBubbleText(greetings[idx]);
+      const idx = Math.floor(Math.random() * GREETINGS.length);
+      setBubbleText(GREETINGS[idx]);
       setShowBubble(true);
       // Sembunyikan bubble setelah 5 detik
       setTimeout(() => setShowBubble(false), 5000);
@@ -36,16 +34,16 @@ export default function MascotWidget() {
   }, [pathname]);
 
   const handleMascotClick = () => {
-    const idx = Math.floor(Math.random() * greetings.length);
-    setBubbleText(greetings[idx]);
+    const idx = Math.floor(Math.random() * GREETINGS.length);
+    setBubbleText(GREETINGS[idx]);
     setShowBubble(true);
     setTimeout(() => setShowBubble(false), 4000);
   };
 
-  if (!isMounted || shouldHide) return null;
+  if (shouldHide) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 z-40 flex flex-col items-end gap-2">
+    <div className="fixed bottom-5 right-3 z-40 flex flex-col items-end gap-2 sm:bottom-24 sm:right-4">
       {/* Speech Bubble */}
       {showBubble && (
         <div

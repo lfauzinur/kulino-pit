@@ -132,14 +132,14 @@ export default function UnitSepedaPage() {
                     )}
 
                     {/* Pricing & CTA */}
-                    <div className="mt-4 flex items-end justify-between border-t-2 border-dashed border-[var(--color-gray-300)] pt-4">
+                    <div className="mt-4 flex flex-col items-start gap-3 border-t-2 border-dashed border-[var(--color-gray-300)] pt-4 min-[420px]:flex-row min-[420px]:items-end min-[420px]:justify-between">
                       <div>
                         <p className="text-[9px] text-[var(--color-gray-500)] mb-0.5">{locale === 'id' ? 'Mulai dari' : 'Starting from'}</p>
                         <p className="font-display font-black text-xl text-[var(--color-orange)]">{formatCurrency(lowestPrice)}</p>
                       </div>
                       <Link
                         href={`/booking?bikeId=${bike.id}`}
-                        className={`brutal-btn px-4 py-2.5 text-[10px] ${bike.available ? 'brutal-btn-primary' : 'border border-red-200 bg-red-50 text-red-600'}`}
+                        className={`brutal-btn w-full px-4 py-2.5 text-center text-[10px] min-[420px]:w-auto ${bike.available ? 'brutal-btn-primary' : 'border border-red-200 bg-red-50 text-red-600'}`}
                       >
                         {bike.available ? t('bikes.checkAvail') : 'Cek Alternatif'}
                       </Link>

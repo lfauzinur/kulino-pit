@@ -15,7 +15,7 @@ export default function ClientLayout({ children }) {
     <I18nProvider>
       <PageLoader />
       {!isAdmin && !isMember && <Navbar />}
-      <main className={!isAdmin && !isMember ? "pt-[72px] min-h-screen" : "min-h-screen"}>
+      <main className={!isAdmin && !isMember ? "min-h-screen overflow-x-hidden pt-16 sm:pt-20" : "min-h-screen"}>
         {children}
       </main>
       {!isAdmin && !isMember && <Footer />}
