@@ -476,7 +476,7 @@ export function galleryRow(row) {
     embedUrl: row.embed_url || '',
     aspectRatio: row.aspect_ratio || '16 / 9',
     mediaPublicId: row.media_public_id,
-    thumbnailUrl: row.thumbnail_url || row.media_url,
+    thumbnailUrl: row.thumbnail_url || (row.media_type === 'photo' ? row.media_url : ''),
     thumbnailPublicId: row.thumbnail_public_id,
     caption: row.caption,
     sortOrder: Number(row.sort_order),
