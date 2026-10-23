@@ -215,22 +215,24 @@ export function ensureAppDatabase() {
 
       await sql`
         INSERT INTO services (title_id, title_en, description_id, description_en, features_id, features_en, price_label, icon, accent_color, sort_order)
-        SELECT * FROM (VALUES
+        SELECT seed.* FROM (VALUES
           ('Dokumentasi Profesional', 'Professional Documentation', 'Layanan foto & video profesional menggunakan Drone, DSLR, dan Action Cam saat gowes.', 'Professional cycling photo and video service using drones, DSLR, and action cameras.', '["Drone DJI Mavic 3 Pro","DSLR Canon EOS R5","GoPro Hero 12 Black","Video Edit & Highlight Reel","Foto High-Res Unlimited"]'::jsonb, '["DJI Mavic 3 Pro Drone","Canon EOS R5 DSLR","GoPro Hero 12 Black","Video Edit & Highlight Reel","Unlimited High-Res Photos"]'::jsonb, 'Mulai dari Rp 500.000', 'camera', '#3B82F6', 10),
           ('Angkut Sepeda (Trucking)', 'Bike Transport (Trucking)', 'Transportasi pengangkutan sepeda antar kota atau ke titik start event.', 'Bike transportation between cities or to an event starting point.', '["Pickup truck hingga 20 unit sepeda","Antar-jemput ke titik start/finish","Antar kota Jawa & Bali","Asuransi pengangkutan","Pengemasan aman dengan foam padding"]'::jsonb, '["Pickup truck for up to 20 bikes","Start/finish point pickup","Java & Bali intercity","Transport insurance","Safe foam-padded packing"]'::jsonb, 'Mulai dari Rp 750.000', 'truck', '#F59E0B', 20),
           ('Manpower Event & Escort', 'Event Manpower & Escort', 'Road Captain, Marshal, MC Event, Mekanik, Tim Medis, dan Patwal.', 'Road Captain, Marshal, Event MC, Mechanic, Medical Team, and Escort.', '["Road Captain bersertifikat","Marshal & Sweeper berpengalaman","MC Event profesional","Mekanik terlatih","Tim medis siaga","Patwal resmi"]'::jsonb, '["Certified Road Captain","Experienced Marshal & Sweeper","Professional Event MC","Trained Mechanic","Standby Medical Team","Official Escort"]'::jsonb, 'Harga disesuaikan', 'users', '#10B981', 30)
         ) AS seed(title_id, title_en, description_id, description_en, features_id, features_en, price_label, icon, accent_color, sort_order)
-        WHERE NOT EXISTS (SELECT 1 FROM services)
+        WHERE NOT EXISTS (SELECT 1 FROM services WHERE LOWER(services.title_id) = LOWER(seed.title_id))
+        ON CONFLICT DO NOTHING
       `;
 
       await sql`
         INSERT INTO gallery_items (title, media_type, media_url, thumbnail_url, caption, sort_order)
-        SELECT * FROM (VALUES
+        SELECT seed.* FROM (VALUES
           ('Sunrise Ride Banyuwangi', 'photo', '/images/hero-banner.png', '/images/hero-banner.png', 'Gowes pagi menikmati panorama Banyuwangi.', 10),
           ('Koleksi Sepeda Kulino Pit', 'photo', '/images/tour_gallery_1.png', '/images/tour_gallery_1.png', 'Unit pilihan untuk berbagai medan dan kebutuhan.', 20),
           ('Kulino Pit Ride Highlight', 'video', '/videos/kulino-pit-highlight.mp4', '/images/hero-banner.png', 'Cuplikan perjalanan, unit, dan suasana gowes bersama Kulino Pit.', 30)
         ) AS seed(title, media_type, media_url, thumbnail_url, caption, sort_order)
-        WHERE NOT EXISTS (SELECT 1 FROM gallery_items)
+        WHERE NOT EXISTS (SELECT 1 FROM gallery_items WHERE gallery_items.media_url = seed.media_url)
+        ON CONFLICT DO NOTHING
       `;
 
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
@@ -239,6 +241,10 @@ export function ensureAppDatabase() {
       await sql`CREATE INDEX IF NOT EXISTS articles_status_idx ON articles (status, published_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS tour_packages_category_idx ON tour_packages (category_id)`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_slug_idx ON tour_packages (slug) WHERE slug <> ''`;
+      await sql`DELETE FROM services a USING services b WHERE LOWER(a.title_id) = LOWER(b.title_id) AND a.id > b.id`;
+      await sql`DELETE FROM gallery_items a USING gallery_items b WHERE a.media_url = b.media_url AND a.id > b.id`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS services_title_lower_idx ON services (LOWER(title_id))`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS gallery_items_media_url_idx ON gallery_items (media_url)`;
       await sql`CREATE INDEX IF NOT EXISTS services_sort_idx ON services (published, sort_order, id)`;
       await sql`CREATE INDEX IF NOT EXISTS gallery_items_sort_idx ON gallery_items (published, sort_order, id)`;
     })().catch((error) => {
