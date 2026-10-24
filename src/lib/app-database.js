@@ -66,6 +66,22 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`
+        CREATE TABLE IF NOT EXISTS members (
+          id BIGSERIAL PRIMARY KEY,
+          member_code TEXT NOT NULL UNIQUE,
+          identity_key TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          phone TEXT DEFAULT '',
+          email TEXT DEFAULT '',
+          provider TEXT NOT NULL DEFAULT 'form',
+          photo_url TEXT DEFAULT '',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          last_login_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+
       await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method_id TEXT DEFAULT ''`;
 
       await sql`ALTER TABLE partner_applications ADD COLUMN IF NOT EXISTS photo_public_id TEXT`;
@@ -306,6 +322,7 @@ export function ensureAppDatabase() {
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS partner_status_idx ON partner_applications (status)`;
+      await sql`CREATE INDEX IF NOT EXISTS members_created_at_idx ON members (created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS articles_status_idx ON articles (status, published_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS tour_packages_category_idx ON tour_packages (category_id)`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_slug_idx ON tour_packages (slug) WHERE slug <> ''`;

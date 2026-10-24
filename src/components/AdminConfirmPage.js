@@ -12,7 +12,7 @@ export default function AdminConfirmPage({ eyebrow = 'Konfirmasi penghapusan', t
       <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-red-50"><Trash2 size={24} className="text-red-500" /></div>
       <h2 className="font-display text-xl font-black text-gray-900">{title}</h2>
       <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-gray-500">{description}</p>
-      <div className="mx-auto mt-6 flex max-w-xl flex-col gap-3 sm:flex-row"><button type="button" disabled={busy} onClick={onCancel} className="btn flex-1 border border-gray-200 text-gray-600 disabled:opacity-50">Kembali</button><button type="button" disabled={busy} onClick={onConfirm} className="btn flex-1 bg-red-500 text-white hover:bg-red-600 disabled:opacity-50">{busy ? 'Memproses…' : 'Hapus Permanen'}</button></div>
+      <div className="mx-auto mt-6 flex max-w-xl flex-col gap-3 sm:flex-row"><button type="button" disabled={busy} onClick={onCancel} className="btn flex-1 border border-gray-200 text-gray-600 disabled:opacity-50">Kembali</button><button type="button" disabled={busy} onClick={() => onConfirm()} className="btn flex-1 bg-red-500 text-white hover:bg-red-600 disabled:opacity-50">{busy ? 'Memproses…' : 'Hapus Permanen'}</button></div>
     </section>
   </div>;
 }

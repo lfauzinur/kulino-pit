@@ -5,6 +5,7 @@ import { Bike, KeyRound, Phone, X, CheckCircle, User } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
+import { syncMemberProfile } from '@/lib/member-sync';
 
 export default function UnifiedLogin() {
   const { t } = useI18n();
@@ -54,38 +55,36 @@ export default function UnifiedLogin() {
     }, 1000);
   };
 
-  const handleGoogleAuth = () => {
+  const handleGoogleAuth = async () => {
     // Cek apakah sudah ada profil tersimpan
     const existingProfile = localStorage.getItem('memberProfile');
     if (existingProfile) {
       // Sudah pernah login — langsung masuk
       setLoading(true);
-      setTimeout(() => {
-        localStorage.setItem('isMember', 'true');
-        router.push(getRedirectUrl('default'));
-      }, 800);
+      const profile = await syncMemberProfile(JSON.parse(existingProfile));
+      localStorage.setItem('memberProfile', JSON.stringify(profile));
+      localStorage.setItem('isMember', 'true');
+      router.push(getRedirectUrl('default'));
     } else {
       // Pengguna baru — minta nama lengkap
       setShowGoogleNameModal(true);
     }
   };
 
-  const handleConfirmGoogleName = () => {
+  const handleConfirmGoogleName = async () => {
     if (!googleName.trim()) return;
     setShowGoogleNameModal(false);
     setLoading(true);
-    setTimeout(() => {
-      const googleUser = {
-        name: googleName.trim(),
-        email: `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-        photo: null,
-        provider: 'google',
-        loginAt: new Date().toISOString(),
-      };
-      localStorage.setItem('memberProfile', JSON.stringify(googleUser));
-      localStorage.setItem('isMember', 'true');
-      router.push(getRedirectUrl('default'));
-    }, 800);
+    const googleUser = await syncMemberProfile({
+      name: googleName.trim(),
+      email: `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
+      photo: null,
+      provider: 'google',
+      loginAt: new Date().toISOString(),
+    });
+    localStorage.setItem('memberProfile', JSON.stringify(googleUser));
+    localStorage.setItem('isMember', 'true');
+    router.push(getRedirectUrl('default'));
   };
 
   const handleResetPassword = (e) => {

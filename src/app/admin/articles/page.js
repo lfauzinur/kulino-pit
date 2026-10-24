@@ -34,7 +34,8 @@ export default function AdminArticlesPage() {
   const [savedArticles, setSavedArticles] = useState([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [editingSlug, setEditingSlug] = useState(null);
-  const [deletingArticle, setDeletingArticle] = useState(null);
+  const [deletingArticles, setDeletingArticles] = useState([]);
+  const [selectedSlugs, setSelectedSlugs] = useState([]);
   const [view, setView] = useState('list');
   const [articleQuery, setArticleQuery] = useState('');
   const [articleStatus, setArticleStatus] = useState('all');
@@ -52,6 +53,7 @@ export default function AdminArticlesPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Daftar artikel gagal dimuat.');
       setSavedArticles(Array.isArray(data) ? data : []);
+      setSelectedSlugs((current) => current.filter((slug) => data.some((article) => article.slug === slug)));
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -107,17 +109,27 @@ export default function AdminArticlesPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const deleteArticle = async (articleToDelete) => {
-    if (articleToDelete) { setDeletingArticle(articleToDelete); return; }
-    const article = deletingArticle; if (!article) return;
+  const requestDelete = (articles) => {
+    const items = Array.isArray(articles) ? articles : [articles];
+    setDeletingArticles(items.filter(Boolean));
+  };
+
+  const deleteArticles = async () => {
+    if (!deletingArticles.length) return;
+    const slugs = deletingArticles.map((article) => article.slug);
     setSaving(true);
     try {
-      const response = await fetch(`/api/articles/${encodeURIComponent(article.slug)}`, { method: 'DELETE' });
+      const response = await fetch('/api/articles', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slugs }),
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Artikel gagal dihapus.');
-      if (editingSlug === article.slug) resetEditor();
-      setDeletingArticle(null);
-      setMessage('Artikel berhasil dihapus.');
+      if (editingSlug && slugs.includes(editingSlug)) resetEditor();
+      setDeletingArticles([]);
+      setSelectedSlugs([]);
+      setMessage(`${Array.isArray(data.deleted) ? data.deleted.length : slugs.length} artikel berhasil dihapus.`);
       await loadArticles();
     } catch (error) {
       setMessage(error.message);
@@ -225,7 +237,10 @@ export default function AdminArticlesPage() {
       && (articleCategory === 'all' || article.category?.id === articleCategory);
   });
 
-  if (deletingArticle) return <AdminConfirmPage title="Hapus Artikel?" description={`Artikel “${deletingArticle.title?.id || deletingArticle.slug}” akan dihapus permanen.`} busy={saving} onCancel={() => setDeletingArticle(null)} onConfirm={deleteArticle} />;
+  if (deletingArticles.length) {
+    const single = deletingArticles.length === 1 ? deletingArticles[0] : null;
+    return <AdminConfirmPage title={single ? 'Hapus Artikel?' : `Hapus ${deletingArticles.length} Artikel?`} description={single ? `Artikel “${single.title?.id || single.slug}” akan dihapus permanen.` : 'Semua artikel terpilih akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.'} busy={saving} onCancel={() => setDeletingArticles([])} onConfirm={deleteArticles} />;
+  }
 
   if (showPreview) {
     return (
@@ -239,6 +254,12 @@ export default function AdminArticlesPage() {
   if (view === 'list') {
     const publishedCount = savedArticles.filter((article) => article.status === 'published').length;
     const draftCount = savedArticles.filter((article) => article.status === 'draft').length;
+    const allFilteredSelected = filteredArticles.length > 0 && filteredArticles.every((article) => selectedSlugs.includes(article.slug));
+    const selectedArticles = savedArticles.filter((article) => selectedSlugs.includes(article.slug));
+    const toggleAll = () => setSelectedSlugs((current) => allFilteredSelected
+      ? current.filter((slug) => !filteredArticles.some((article) => article.slug === slug))
+      : [...new Set([...current, ...filteredArticles.map((article) => article.slug)])]);
+    const toggleOne = (slug) => setSelectedSlugs((current) => current.includes(slug) ? current.filter((item) => item !== slug) : [...current, slug]);
     return (
       <div className="space-y-6 pb-12 animate-fade-in">
         <header className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Content Management</p><h1 className="mt-1 flex items-center gap-2 font-display text-3xl font-black text-gray-900"><FileText className="text-blue-600" /> Artikel</h1><p className="mt-1 text-sm text-gray-500">Kelola artikel lama, draft, dan artikel terbit dari satu daftar.</p></div><button onClick={resetEditor} className="btn btn-primary flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold"><Plus size={17} /> Tambah Artikel</button></header>
@@ -249,11 +270,12 @@ export default function AdminArticlesPage() {
           <div className="border-b border-gray-100 p-5 sm:p-6">
             <div className="flex flex-wrap gap-4 border-b border-gray-100 pb-4 text-sm font-bold">{[['all', `Semua (${savedArticles.length})`], ['published', `Terbit (${publishedCount})`], ['draft', `Draft (${draftCount})`]].map(([status, label]) => <button key={status} onClick={() => setArticleStatus(status)} className={articleStatus === status ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'}>{label}</button>)}</div>
             <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto]"><label className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} className="clean-input pl-10" placeholder="Cari judul, penulis, atau tag…" /></label><select value={articleCategory} onChange={(event) => setArticleCategory(event.target.value)} className="clean-input"><option value="all">Semua kategori</option>{articleCategories.map((item) => <option key={item} value={item}>{item}</option>)}</select><select value={articleStatus} onChange={(event) => setArticleStatus(event.target.value)} className="clean-input"><option value="all">Semua status</option><option value="published">Terbit</option><option value="draft">Draft</option></select><button onClick={loadArticles} className="btn flex items-center justify-center gap-2 border border-gray-200 px-4 text-sm font-bold text-gray-600"><RefreshCw size={15} className={loadingArticles ? 'animate-spin' : ''} /> Muat ulang</button></div>
+            {selectedSlugs.length > 0 && <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-red-100 bg-red-50 p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-bold text-red-700">{selectedSlugs.length} artikel dipilih</p><div className="flex gap-2"><button type="button" onClick={() => setSelectedSlugs([])} className="btn flex-1 border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-600 sm:flex-none">Batalkan pilihan</button><button type="button" onClick={() => requestDelete(selectedArticles)} className="btn flex flex-1 items-center justify-center gap-2 bg-red-500 px-4 py-2 text-xs font-bold text-white sm:flex-none"><Trash2 size={14} /> Hapus massal</button></div></div>}
           </div>
 
           {loadingArticles ? <div className="p-12 text-center text-sm text-gray-400">Memuat artikel…</div> : filteredArticles.length === 0 ? <div className="p-12 text-center"><FileText className="mx-auto text-gray-300" size={38} /><p className="mt-3 text-sm font-bold text-gray-600">Artikel tidak ditemukan.</p></div> : <>
-            <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-gray-50 text-[11px] font-black uppercase tracking-wide text-gray-500"><tr><th className="px-5 py-4">Judul</th><th className="px-5 py-4">Penulis</th><th className="px-5 py-4">Kategori</th><th className="px-5 py-4">Tag</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Tanggal</th><th className="px-5 py-4 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-100">{filteredArticles.map((article) => <tr key={article.slug} className="hover:bg-blue-50/30"><td className="px-5 py-4"><button onClick={() => editArticle(article)} className="max-w-xs text-left font-black text-blue-700 hover:underline">{article.title?.id || article.title?.en || article.slug}</button><p className="mt-1 max-w-xs truncate text-xs text-gray-400">/{article.slug}</p></td><td className="px-5 py-4 text-gray-600">{article.author || '—'}</td><td className="px-5 py-4 font-semibold text-gray-700">{article.category?.id || '—'}</td><td className="px-5 py-4"><div className="flex max-w-48 flex-wrap gap-1">{(article.tags || []).slice(0, 3).map((tag) => <span key={tag} className="rounded bg-gray-100 px-2 py-1 text-[10px] text-gray-600">{tag}</span>)}</div></td><td className="px-5 py-4"><StatusBadge status={article.status} /></td><td className="px-5 py-4 text-gray-500">{article.date}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => editArticle(article)} className="rounded-lg bg-blue-50 p-2 text-blue-600" title="Edit"><Pencil size={15} /></button><button onClick={() => deleteArticle(article)} className="rounded-lg bg-red-50 p-2 text-red-600" title="Hapus"><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>
-            <div className="divide-y divide-gray-100 md:hidden">{filteredArticles.map((article) => <article key={article.slug} className="p-5"><div className="flex items-start justify-between gap-3"><div><button onClick={() => editArticle(article)} className="text-left font-black text-blue-700">{article.title?.id || article.title?.en || article.slug}</button><p className="mt-1 text-xs text-gray-400">{article.author || '—'} · {article.date}</p></div><StatusBadge status={article.status} /></div><p className="mt-3 text-xs font-semibold text-gray-500">{article.category?.id || 'Tanpa kategori'}</p><div className="mt-4 flex gap-2"><button onClick={() => editArticle(article)} className="btn flex flex-1 items-center justify-center gap-2 border border-blue-200 bg-blue-50 py-2 text-xs font-bold text-blue-700"><Pencil size={14} /> Edit</button><button onClick={() => deleteArticle(article)} className="btn border border-red-200 bg-red-50 px-4 text-red-600"><Trash2 size={14} /></button></div></article>)}</div>
+            <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-gray-50 text-[11px] font-black uppercase tracking-wide text-gray-500"><tr><th className="px-5 py-4"><input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} aria-label="Pilih semua artikel yang tampil" className="h-4 w-4 accent-blue-600" /></th><th className="px-5 py-4">Judul</th><th className="px-5 py-4">Penulis</th><th className="px-5 py-4">Kategori</th><th className="px-5 py-4">Tag</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Tanggal</th><th className="px-5 py-4 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-100">{filteredArticles.map((article) => <tr key={article.slug} className="hover:bg-blue-50/30"><td className="px-5 py-4"><input type="checkbox" checked={selectedSlugs.includes(article.slug)} onChange={() => toggleOne(article.slug)} aria-label={`Pilih ${article.title?.id || article.slug}`} className="h-4 w-4 accent-blue-600" /></td><td className="px-5 py-4"><button onClick={() => editArticle(article)} className="max-w-xs text-left font-black text-blue-700 hover:underline">{article.title?.id || article.title?.en || article.slug}</button><p className="mt-1 max-w-xs truncate text-xs text-gray-400">/{article.slug}</p></td><td className="px-5 py-4 text-gray-600">{article.author || '—'}</td><td className="px-5 py-4 font-semibold text-gray-700">{article.category?.id || '—'}</td><td className="px-5 py-4"><div className="flex max-w-48 flex-wrap gap-1">{(article.tags || []).slice(0, 3).map((tag) => <span key={tag} className="rounded bg-gray-100 px-2 py-1 text-[10px] text-gray-600">{tag}</span>)}</div></td><td className="px-5 py-4"><StatusBadge status={article.status} /></td><td className="px-5 py-4 text-gray-500">{article.date}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => editArticle(article)} className="rounded-lg bg-blue-50 p-2 text-blue-600" title="Edit"><Pencil size={15} /></button><button onClick={() => requestDelete(article)} className="rounded-lg bg-red-50 p-2 text-red-600" title="Hapus"><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>
+            <div className="divide-y divide-gray-100 md:hidden">{filteredArticles.map((article) => <article key={article.slug} className="p-5"><div className="flex items-start gap-3"><input type="checkbox" checked={selectedSlugs.includes(article.slug)} onChange={() => toggleOne(article.slug)} aria-label={`Pilih ${article.title?.id || article.slug}`} className="mt-1 h-4 w-4 shrink-0 accent-blue-600" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><button onClick={() => editArticle(article)} className="text-left font-black text-blue-700">{article.title?.id || article.title?.en || article.slug}</button><p className="mt-1 text-xs text-gray-400">{article.author || '—'} · {article.date}</p></div><StatusBadge status={article.status} /></div><p className="mt-3 text-xs font-semibold text-gray-500">{article.category?.id || 'Tanpa kategori'}</p><div className="mt-4 flex gap-2"><button onClick={() => editArticle(article)} className="btn flex flex-1 items-center justify-center gap-2 border border-blue-200 bg-blue-50 py-2 text-xs font-bold text-blue-700"><Pencil size={14} /> Edit</button><button onClick={() => requestDelete(article)} className="btn border border-red-200 bg-red-50 px-4 text-red-600"><Trash2 size={14} /></button></div></div></div></article>)}</div>
           </>}
         </section>
       </div>

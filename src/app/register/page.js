@@ -5,6 +5,7 @@ import { Bike, KeyRound, Phone, User, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
+import { syncMemberProfile } from '@/lib/member-sync';
 
 export default function MemberRegister() {
   const { t } = useI18n();
@@ -28,20 +29,18 @@ export default function MemberRegister() {
     return bookBike ? `${base}?bookBike=${bookBike}` : base;
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      const memberProfile = {
-        name: name,
-        wa: wa,
-        provider: 'form',
-        registeredAt: new Date().toISOString(),
-      };
-      localStorage.setItem('isMember', 'true');
-      localStorage.setItem('memberProfile', JSON.stringify(memberProfile));
-      router.push(getMemberRedirect());
-    }, 1000);
+    const memberProfile = await syncMemberProfile({
+      name,
+      wa,
+      provider: 'form',
+      registeredAt: new Date().toISOString(),
+    });
+    localStorage.setItem('isMember', 'true');
+    localStorage.setItem('memberProfile', JSON.stringify(memberProfile));
+    router.push(getMemberRedirect());
   };
 
   const handleGoogleAuth = () => {
@@ -49,22 +48,20 @@ export default function MemberRegister() {
     setShowGoogleNameModal(true);
   };
 
-  const handleConfirmGoogleName = () => {
+  const handleConfirmGoogleName = async () => {
     if (!googleName.trim()) return;
     setShowGoogleNameModal(false);
     setLoading(true);
-    setTimeout(() => {
-      const googleUser = {
-        name: googleName.trim(),
-        email: `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-        photo: null,
-        provider: 'google',
-        registeredAt: new Date().toISOString(),
-      };
-      localStorage.setItem('isMember', 'true');
-      localStorage.setItem('memberProfile', JSON.stringify(googleUser));
-      router.push(getMemberRedirect());
-    }, 800);
+    const googleUser = await syncMemberProfile({
+      name: googleName.trim(),
+      email: `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
+      photo: null,
+      provider: 'google',
+      registeredAt: new Date().toISOString(),
+    });
+    localStorage.setItem('isMember', 'true');
+    localStorage.setItem('memberProfile', JSON.stringify(googleUser));
+    router.push(getMemberRedirect());
   };
 
   return (

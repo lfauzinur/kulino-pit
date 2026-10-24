@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { ArrowLeft, Users, CheckCircle, XCircle, Clock, MessageCircle, Eye, Bike, Phone, MapPin, Hash, FileText, AlertCircle, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, Users, CheckCircle, XCircle, Clock, MessageCircle, Eye, Bike, Phone, MapPin, Hash, FileText, AlertCircle, RefreshCcw, Trash2 } from 'lucide-react';
+import AdminConfirmPage from '@/components/AdminConfirmPage';
 
 export default function AdminPartnersPage() {
   const [partners, setPartners] = useState([]);
@@ -11,6 +12,7 @@ export default function AdminPartnersPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState('');
+  const [deletingPartner, setDeletingPartner] = useState(null);
 
   const loadPartners = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -57,6 +59,28 @@ export default function AdminPartnersPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deletingPartner) return;
+    setUpdatingId(deletingPartner.id);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch(`/api/partners/${encodeURIComponent(deletingPartner.id)}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Partner gagal dihapus.');
+      const deletedName = deletingPartner.name;
+      setDeletingPartner(null);
+      setSelectedPartner(null);
+      setSuccess(`Pendaftaran ${deletedName} berhasil dihapus.`);
+      await loadPartners({ silent: true });
+    } catch (requestError) {
+      setError(requestError.message);
+      setDeletingPartner(null);
+    } finally {
+      setUpdatingId('');
+    }
+  };
+
   const statusIcon = (status) => {
     switch(status) {
       case 'Pending': return <Clock size={12} />;
@@ -87,6 +111,8 @@ export default function AdminPartnersPage() {
   const filters = ['All', 'Pending', 'Approved', 'Rejected'];
   const filtered = filter === 'All' ? partners : partners.filter(p => p.status === filter);
   const pendingCount = partners.filter(p => p.status === 'Pending').length;
+
+  if (deletingPartner) return <AdminConfirmPage title="Hapus Pendaftaran Partner?" description={`Pendaftaran “${deletingPartner.name}” (${deletingPartner.id}) beserta foto sepedanya akan dihapus permanen.`} busy={updatingId === deletingPartner.id} onCancel={() => setDeletingPartner(null)} onConfirm={handleDelete} />;
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
@@ -217,6 +243,7 @@ export default function AdminPartnersPage() {
                       >
                         <MessageCircle size={16} />
                       </a>
+                      <button type="button" onClick={() => setDeletingPartner(p)} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Hapus pendaftaran partner"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -341,7 +368,7 @@ export default function AdminPartnersPage() {
               )}
 
               {/* Actions */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-wrap gap-3 pt-2">
                 {selectedPartner.status === 'Pending' && (
                   <>
                     <button 
@@ -366,6 +393,7 @@ export default function AdminPartnersPage() {
                 >
                   <MessageCircle size={15} /> WhatsApp
                 </a>
+                <button type="button" onClick={() => setDeletingPartner(selectedPartner)} className="btn flex items-center justify-center gap-2 border border-red-200 px-4 py-3 text-red-600 hover:bg-red-50"><Trash2 size={15} /> Hapus</button>
               </div>
             </div>
           </div>

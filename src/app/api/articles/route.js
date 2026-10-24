@@ -71,3 +71,38 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Artikel gagal disimpan.' }, { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: noStore });
+  }
+
+  try {
+    await ensureAppDatabase();
+    const body = await request.json();
+    const slugs = [...new Set((Array.isArray(body.slugs) ? body.slugs : [])
+      .map((slug) => String(slug || '').trim())
+      .filter(Boolean))];
+    if (!slugs.length) {
+      return NextResponse.json({ error: 'Pilih minimal satu artikel.' }, { status: 400, headers: noStore });
+    }
+    if (slugs.length > 100) {
+      return NextResponse.json({ error: 'Maksimal 100 artikel per penghapusan.' }, { status: 400, headers: noStore });
+    }
+
+    const rows = await sql`
+      DELETE FROM articles
+      WHERE slug IN (
+        SELECT jsonb_array_elements_text(${JSON.stringify(slugs)}::jsonb)
+      )
+      RETURNING slug
+    `;
+    if (!rows.length) {
+      return NextResponse.json({ error: 'Artikel terpilih tidak ditemukan.' }, { status: 404, headers: noStore });
+    }
+    return NextResponse.json({ success: true, deleted: rows.map((row) => row.slug) }, { headers: noStore });
+  } catch (error) {
+    console.error('DELETE /api/articles error:', error);
+    return NextResponse.json({ error: 'Artikel gagal dihapus.' }, { status: 500, headers: noStore });
+  }
+}
