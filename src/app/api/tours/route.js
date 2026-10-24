@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { ensureAppDatabase, sql, tourRow } from '@/lib/app-database';
 
 export const dynamic = 'force-dynamic';
-const noStore = { 'Cache-Control': 'no-store, max-age=0' };
+const noStore = {
+  'Cache-Control': 'no-store, max-age=0',
+  'X-Kulino-API-Version': 'tours-gallery-v2',
+};
 
 export async function GET(request) {
   try {
