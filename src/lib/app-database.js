@@ -138,6 +138,7 @@ export function ensureAppDatabase() {
       await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS difficulty_en TEXT NOT NULL DEFAULT 'Easy'`;
       await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS image TEXT NOT NULL DEFAULT '/images/hero-banner.png'`;
       await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS image_public_id TEXT`;
+      await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS gallery JSONB NOT NULL DEFAULT '[]'::jsonb`;
       await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS includes_id JSONB NOT NULL DEFAULT '[]'::jsonb`;
       await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS includes_en JSONB NOT NULL DEFAULT '[]'::jsonb`;
       await sql`ALTER TABLE tour_packages ADD COLUMN IF NOT EXISTS meeting_point TEXT NOT NULL DEFAULT 'Kulino House, Banyuwangi'`;
@@ -360,6 +361,11 @@ export function bikeRow(row) {
     category: row.category,
     image: row.image,
     imagePublicId: row.image_public_id,
+    gallery: Array.isArray(row.gallery)
+      ? row.gallery
+        .map((item) => typeof item === 'string' ? { url: item, publicId: '' } : item)
+        .filter((item) => item && typeof item.url === 'string' && item.url.trim())
+      : [],
     frameSize: Array.isArray(row.frame_size) ? row.frame_size : (row.frame_size ? JSON.parse(row.frame_size) : ['M']),
     pricePerDay: Number(row.price_per_day),
     price2h: Number(row.price_2h),

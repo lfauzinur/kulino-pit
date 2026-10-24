@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Banknote, CheckCircle2, CreditCard, ImagePlus, Pencil, Plus, Power, QrCode, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, ImagePlus, Pencil, Plus, Power, QrCode, Save, Trash2 } from 'lucide-react';
 
 const blankMethod = {
   type: 'bank',
@@ -44,20 +44,6 @@ export default function AdminPaymentsPage() {
   }, []);
 
   useEffect(() => { Promise.resolve().then(loadMethods); }, [loadMethods]);
-
-  useEffect(() => {
-    if (!editing) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setEditing(null);
-    };
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [editing]);
 
   const openCreate = () => {
     setEditing('new');
@@ -139,6 +125,43 @@ export default function AdminPaymentsPage() {
     }
   };
 
+  if (editing) {
+    return (
+      <div className="space-y-6 pb-14 animate-fade-in">
+        <header className="flex flex-col gap-4 rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex items-start gap-3">
+            <button type="button" onClick={() => setEditing(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100" aria-label="Kembali ke metode pembayaran"><ArrowLeft size={20} /></button>
+            <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">CRUD Pembayaran</p><h1 className="font-display text-2xl font-black text-gray-900 sm:text-3xl">{editing === 'new' ? 'Tambah' : 'Edit'} Metode Pembayaran</h1><p className="mt-1 text-sm text-gray-500">Editor langsung di halaman—tanpa popup dan tanpa scroll bertumpuk.</p></div>
+          </div>
+          <button form="payment-method-form" type="submit" disabled={saving || uploading} className="btn btn-primary flex items-center justify-center gap-2 px-5 py-3 disabled:opacity-50"><Save size={17} /> {saving ? 'Menyimpan…' : 'Simpan Pembayaran'}</button>
+        </header>
+
+        {message.text && <div className={`rounded-2xl border p-4 text-sm font-semibold ${message.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>{message.text}</div>}
+
+        <form id="payment-method-form" onSubmit={saveMethod} className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <main className="clean-card space-y-5 border border-gray-100 p-5 sm:p-7">
+            <div><h2 className="font-display text-xl font-black text-gray-900">Detail Metode</h2><p className="mt-1 text-sm text-gray-500">Data ini digunakan langsung oleh alur booking dan tiket pembayaran member.</p></div>
+            <div className="grid grid-cols-2 gap-3">
+              {[['bank', 'Transfer Bank', Banknote], ['qris', 'QRIS', QrCode]].map(([type, label, Icon]) => <button key={type} type="button" onClick={() => setForm((current) => ({ ...current, type, name: current.name || label }))} className={`flex items-center justify-center gap-2 rounded-2xl border p-4 text-sm font-bold ${form.type === type ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'}`}><Icon size={17} /> {label}</button>)}
+            </div>
+            <Field label="Nama Tampilan"><input required className="clean-input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Contoh: Transfer BCA" /></Field>
+            {form.type === 'bank' ? <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Nama Bank / Provider"><input required className="clean-input" value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value })} placeholder="BCA" /></Field>
+              <Field label="Nomor Rekening"><input required inputMode="numeric" className="clean-input" value={form.accountNumber} onChange={(event) => setForm({ ...form, accountNumber: event.target.value })} placeholder="Nomor rekening" /></Field>
+              <div className="sm:col-span-2"><Field label="Nama Pemilik Rekening"><input required className="clean-input" value={form.accountHolder} onChange={(event) => setForm({ ...form, accountHolder: event.target.value })} placeholder="Nama sesuai rekening" /></Field></div>
+            </div> : <Field label="Gambar QRIS"><label className="btn btn-primary flex cursor-pointer items-center justify-center gap-2 py-3"><ImagePlus size={17} /> {uploading ? 'Mengunggah…' : 'Upload QRIS'}<input type="file" accept="image/*" className="hidden" onChange={(event) => uploadQris(event.target.files?.[0])} /></label>{form.imageUrl && <div className="relative mx-auto mt-4 h-64 w-64 max-w-full overflow-hidden rounded-2xl border border-gray-100"><Image src={form.imageUrl} alt="Preview QRIS" fill className="object-contain p-3" unoptimized /></div>}</Field>}
+            <Field label="Instruksi Pembayaran"><textarea rows="5" className="clean-input resize-y" value={form.instructions} onChange={(event) => setForm({ ...form, instructions: event.target.value })} placeholder="Instruksi yang tampil di tiket pembayaran" /></Field>
+            <Field label="Urutan"><input type="number" className="clean-input" value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: event.target.value })} /></Field>
+          </main>
+          <aside className="space-y-5 xl:sticky xl:top-6 xl:self-start">
+            <section className="clean-card border border-gray-100 p-5"><h2 className="font-display text-lg font-black text-gray-900">Status</h2><button type="button" onClick={() => setForm({ ...form, active: !form.active })} className={`mt-4 flex w-full items-center justify-between rounded-2xl border p-4 text-sm font-bold ${form.active ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-500'}`}><span>{form.active ? 'Aktif untuk booking' : 'Tidak ditampilkan'}</span>{form.active ? <CheckCircle2 size={20} /> : <Power size={20} />}</button><div className="mt-5 space-y-2 border-t border-gray-100 pt-5"><button disabled={saving || uploading} className="btn btn-primary flex w-full items-center justify-center gap-2 py-3 disabled:opacity-50"><Save size={17} /> {saving ? 'Menyimpan…' : 'Simpan Pembayaran'}</button><button type="button" onClick={() => setEditing(null)} className="btn w-full border border-gray-200 py-3 font-bold text-gray-600">Batal</button></div></section>
+            <section className="rounded-3xl border border-blue-100 bg-blue-50 p-5 text-sm leading-6 text-blue-900"><strong>Terhubung ke booking</strong><p className="mt-1 text-blue-700">Metode aktif otomatis tersedia pada langkah pembayaran dan tiket member.</p></section>
+          </aside>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-7 pb-12 animate-fade-in">
       <header className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -194,39 +217,6 @@ export default function AdminPaymentsPage() {
 
       {!loading && methods.length === 0 && <div className="rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center"><CreditCard className="mx-auto text-gray-300" size={40} /><p className="mt-3 font-bold text-gray-700">Belum ada metode pembayaran.</p></div>}
 
-      {editing && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-gray-950/55 p-3 backdrop-blur-[2px] sm:p-5" onClick={() => setEditing(null)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="payment-modal-title" className="flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2.5rem)] sm:max-w-xl" onClick={(event) => event.stopPropagation()}>
-            <div className="z-10 flex shrink-0 items-center justify-between gap-4 border-b border-gray-100 bg-white px-5 py-4 sm:px-6">
-              <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-wider text-[var(--color-primary)]">CRUD Pembayaran</p><h2 id="payment-modal-title" className="truncate font-display text-xl font-black text-gray-900 sm:text-2xl">{editing === 'new' ? 'Tambah' : 'Edit'} Metode</h2></div>
-              <button type="button" onClick={() => setEditing(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900" aria-label="Tutup modal pembayaran"><X size={20} /></button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
-            <form id="payment-method-form" onSubmit={saveMethod} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                {[['bank', 'Transfer Bank', Banknote], ['qris', 'QRIS', QrCode]].map(([type, label, Icon]) => <button key={type} type="button" onClick={() => setForm((current) => ({ ...current, type, name: current.name || label }))} className={`flex items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-bold ${form.type === type ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'}`}><Icon size={17} /> {label}</button>)}
-              </div>
-              <Field label="Nama Tampilan"><input required className="clean-input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Contoh: Transfer BCA" /></Field>
-              {form.type === 'bank' ? <>
-                <Field label="Nama Bank / Provider"><input required className="clean-input" value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value })} placeholder="BCA" /></Field>
-                <Field label="Nomor Rekening"><input required inputMode="numeric" className="clean-input" value={form.accountNumber} onChange={(event) => setForm({ ...form, accountNumber: event.target.value })} placeholder="Nomor rekening" /></Field>
-                <Field label="Nama Pemilik Rekening"><input required className="clean-input" value={form.accountHolder} onChange={(event) => setForm({ ...form, accountHolder: event.target.value })} placeholder="Nama sesuai rekening" /></Field>
-              </> : <Field label="Gambar QRIS">
-                <label className="btn btn-primary flex cursor-pointer items-center justify-center gap-2 py-3"><ImagePlus size={17} /> {uploading ? 'Mengunggah…' : 'Upload QRIS'}<input type="file" accept="image/*" className="hidden" onChange={(event) => uploadQris(event.target.files?.[0])} /></label>
-                {form.imageUrl && <div className="relative mx-auto mt-3 h-48 w-48 overflow-hidden rounded-2xl border border-gray-100"><Image src={form.imageUrl} alt="Preview QRIS" fill className="object-contain p-2" unoptimized /></div>}
-              </Field>}
-              <Field label="Instruksi Pembayaran"><textarea rows="3" className="clean-input" value={form.instructions} onChange={(event) => setForm({ ...form, instructions: event.target.value })} placeholder="Instruksi yang tampil di tiket pembayaran" /></Field>
-              <Field label="Urutan"><input type="number" className="clean-input" value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: event.target.value })} /></Field>
-              <button type="button" onClick={() => setForm({ ...form, active: !form.active })} className={`flex w-full items-center justify-between rounded-2xl border p-4 text-sm font-bold ${form.active ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-500'}`}><span>{form.active ? 'Aktif untuk booking' : 'Tidak ditampilkan saat booking'}</span>{form.active ? <CheckCircle2 size={20} /> : <Power size={20} />}</button>
-            </form>
-            </div>
-            <div className="flex shrink-0 gap-3 border-t border-gray-100 bg-white px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
-              <button type="button" onClick={() => setEditing(null)} className="btn flex-1 border border-gray-200 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50">Batal</button>
-              <button form="payment-method-form" type="submit" disabled={saving || uploading} className="btn btn-primary flex-[1.5] py-3 text-sm font-bold disabled:opacity-50">{saving ? 'Menyimpan…' : 'Simpan Pembayaran'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

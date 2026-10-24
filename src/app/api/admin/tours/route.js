@@ -10,6 +10,10 @@ function categoryRow(row) {
 }
 
 const textList = (value) => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+const imageList = (value) => Array.isArray(value) ? value.map((item) => ({
+  url: String(typeof item === 'string' ? item : item?.url || '').trim(),
+  publicId: String(typeof item === 'string' ? '' : item?.publicId || '').trim(),
+})).filter((item) => item.url).slice(0, 20) : [];
 const slugify = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 async function loadTourData() {
@@ -68,13 +72,14 @@ export async function POST(request) {
       const rows = await sql`
         INSERT INTO tour_packages (
           name, slug, price, category_id, duration, distance, difficulty_id, difficulty_en,
-          description_id, description_en, image, image_public_id, includes_id, includes_en,
+          description_id, description_en, image, image_public_id, gallery, includes_id, includes_en,
           meeting_point, published
         )
         SELECT ${name}, ${slug}, ${price}, id, ${duration}, ${String(body.distance || '').trim()},
           ${String(body.difficultyId || 'Mudah').trim()}, ${String(body.difficultyEn || 'Easy').trim()},
           ${String(body.descriptionId || '').trim()}, ${String(body.descriptionEn || body.descriptionId || '').trim()},
           ${String(body.image || '/images/hero-banner.png')}, ${body.imagePublicId || null},
+          ${JSON.stringify(imageList(body.gallery))}::jsonb,
           ${JSON.stringify(textList(body.includesId))}::jsonb, ${JSON.stringify(textList(body.includesEn))}::jsonb,
           ${String(body.meetingPoint || 'Kulino House, Banyuwangi').trim()}, ${body.published !== false}
         FROM tour_categories WHERE id = ${categoryId}

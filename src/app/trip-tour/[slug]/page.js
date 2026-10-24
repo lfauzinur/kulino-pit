@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/data';
 import { useI18n } from '@/lib/i18n';
-import { MapPin, Calendar, Clock, Map, CheckCircle2, Navigation, ShieldCheck, Camera, ChevronLeft } from 'lucide-react';
+import { MapPin, Clock, Map, CheckCircle2, Navigation, ShieldCheck, ChevronLeft } from 'lucide-react';
 
 export default function TourDetail({ params }) {
   const unwrappedParams = use(params);
@@ -25,12 +25,8 @@ export default function TourDetail({ params }) {
   if (loading) return <div className="min-h-[60vh] py-40 text-center font-semibold text-gray-400">Memuat detail tour…</div>;
   if (!tour) return <div className="min-h-[60vh] py-40 text-center"><h1 className="font-display text-3xl font-black">Tour tidak ditemukan</h1><Link href="/trip-tour" className="mt-5 inline-flex text-[var(--color-primary)]">Kembali ke daftar tour</Link></div>;
 
-  // Placeholder gallery images
-  const gallery = [
-    tour.image,
-    '/images/tour_gallery_1.png',
-    '/images/hero-banner.png'
-  ];
+  const gallery = [tour.image, ...(tour.gallery || []).map((item) => item.url || item)]
+    .filter((url, index, items) => url && items.indexOf(url) === index);
 
   return (
     <div className="pt-24 pb-20 bg-gray-50 min-h-screen">
@@ -66,21 +62,21 @@ export default function TourDetail({ params }) {
             {/* Main Gallery */}
             <div className="clean-card p-2 bg-white border border-gray-100">
               <div className="relative h-[400px] w-full rounded-2xl overflow-hidden mb-2">
-                <Image 
+                <Image
                   src={gallery[0]} 
                   alt={tour.name[locale] || tour.name.en} 
                   fill 
                   className="object-cover"
+                  unoptimized
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative h-48 w-full rounded-2xl overflow-hidden">
-                  <Image src={gallery[1]} alt="Gallery 1" fill className="object-cover" />
-                </div>
-                <div className="relative h-48 w-full rounded-2xl overflow-hidden">
-                  <Image src={gallery[2]} alt="Gallery 2" fill className="object-cover" />
-                </div>
-              </div>
+              {gallery.length > 1 && <div className={`grid gap-2 ${gallery.length > 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {gallery.slice(1).map((imageUrl, index) => (
+                  <div key={`${imageUrl}-${index}`} className="relative h-48 w-full overflow-hidden rounded-2xl sm:h-64">
+                    <Image src={imageUrl} alt={`Galeri ${tour.name[locale] || tour.name.en} ${index + 1}`} fill className="object-cover" unoptimized />
+                  </div>
+                ))}
+              </div>}
             </div>
 
             {/* Tour Description */}

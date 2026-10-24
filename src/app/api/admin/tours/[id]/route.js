@@ -4,6 +4,10 @@ import { ensureAppDatabase, sql, tourRow } from '@/lib/app-database';
 
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
 const textList = (value) => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+const imageList = (value) => Array.isArray(value) ? value.map((item) => ({
+  url: String(typeof item === 'string' ? item : item?.url || '').trim(),
+  publicId: String(typeof item === 'string' ? '' : item?.publicId || '').trim(),
+})).filter((item) => item.url).slice(0, 20) : [];
 const slugify = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 async function getId(params) {
@@ -38,6 +42,7 @@ export async function PATCH(request, { params }) {
           description_id = ${String(body.descriptionId || '').trim()},
           description_en = ${String(body.descriptionEn || body.descriptionId || '').trim()},
           image = ${String(body.image || '/images/hero-banner.png')}, image_public_id = ${body.imagePublicId || null},
+          gallery = ${JSON.stringify(imageList(body.gallery))}::jsonb,
           includes_id = ${JSON.stringify(textList(body.includesId))}::jsonb,
           includes_en = ${JSON.stringify(textList(body.includesEn))}::jsonb,
           meeting_point = ${String(body.meetingPoint || 'Kulino House, Banyuwangi').trim()},

@@ -1,8 +1,9 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import {
   Eye, Type, Image as ImageIcon, Bold, Italic, List, Grid, Link as LinkIcon,
-  Code, Trash2, ArrowDown, ArrowUp, Plus, Save, X, Pencil, FileText, RefreshCw,
+  Code, Trash2, ArrowDown, ArrowUp, Plus, Save, Pencil, FileText, RefreshCw, Search, ArrowLeft,
 } from 'lucide-react';
 
 const newTextBlock = () => ({ id: crypto.randomUUID(), type: 'text', title: '', content: '' });
@@ -32,6 +33,10 @@ export default function AdminArticlesPage() {
   const [savedArticles, setSavedArticles] = useState([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [editingSlug, setEditingSlug] = useState(null);
+  const [view, setView] = useState('list');
+  const [articleQuery, setArticleQuery] = useState('');
+  const [articleStatus, setArticleStatus] = useState('all');
+  const [articleCategory, setArticleCategory] = useState('all');
   const fileInputs = useRef({});
 
   const currentTitle = title[language];
@@ -58,6 +63,7 @@ export default function AdminArticlesPage() {
   }, [loadArticles]);
 
   const resetEditor = () => {
+    setView('editor');
     setEditingSlug(null);
     setTitle({ id: '', en: '' });
     setPublishedGlobally(true);
@@ -75,6 +81,7 @@ export default function AdminArticlesPage() {
   };
 
   const editArticle = (article) => {
+    setView('editor');
     setEditingSlug(article.slug);
     setTitle({ id: article.title?.id || '', en: article.title?.en || '' });
     setPublishedGlobally(Boolean(article.publishedGlobally));
@@ -204,63 +211,66 @@ export default function AdminArticlesPage() {
     }
   };
 
+  const articleCategories = [...new Set(savedArticles.map((article) => article.category?.id).filter(Boolean))].sort();
+  const filteredArticles = savedArticles.filter((article) => {
+    const query = articleQuery.toLowerCase().trim();
+    const searchable = `${article.title?.id || ''} ${article.title?.en || ''} ${article.author || ''} ${(article.tags || []).join(' ')}`.toLowerCase();
+    return (!query || searchable.includes(query))
+      && (articleStatus === 'all' || article.status === articleStatus)
+      && (articleCategory === 'all' || article.category?.id === articleCategory);
+  });
+
+  if (showPreview) {
+    return (
+      <div className="space-y-6 pb-12 animate-fade-in">
+        <header className="flex flex-col gap-4 rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6"><div className="flex items-start gap-3"><button onClick={() => setShowPreview(false)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100" aria-label="Kembali ke editor"><ArrowLeft size={20} /></button><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Preview Artikel</p><h1 className="font-display text-2xl font-black text-gray-900">Pratinjau halaman publik</h1><p className="mt-1 text-sm text-gray-500">Preview dibuka sebagai halaman, bukan popup.</p></div></div><button onClick={() => setShowPreview(false)} className="btn border border-gray-200 bg-white px-5 py-3 text-sm font-bold text-gray-700">Kembali ke Editor</button></header>
+        <article className="mx-auto w-full max-w-4xl rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sm:p-10"><p className="text-xs font-bold uppercase text-blue-600">{category}</p><h1 className="mt-2 font-display text-3xl font-black sm:text-5xl">{previewTitle}</h1><p className="mt-3 text-sm text-gray-500">{author} · {publishedAt.replace('T', ' ')}</p>{firstImage && <Image src={firstImage} alt="Article preview" width={1200} height={720} className="mt-7 max-h-[32rem] w-full rounded-2xl object-cover" unoptimized />}<div className="mt-8 space-y-7">{blocks.filter((block) => block.type === 'text').map((block) => <section key={block.id}>{block.title && <h2 className="font-display text-2xl font-bold">{block.title}</h2>}<p className="mt-2 whitespace-pre-wrap leading-8 text-gray-700">{block.content}</p></section>)}</div></article>
+      </div>
+    );
+  }
+
+  if (view === 'list') {
+    const publishedCount = savedArticles.filter((article) => article.status === 'published').length;
+    const draftCount = savedArticles.filter((article) => article.status === 'draft').length;
+    return (
+      <div className="space-y-6 pb-12 animate-fade-in">
+        <header className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Content Management</p><h1 className="mt-1 flex items-center gap-2 font-display text-3xl font-black text-gray-900"><FileText className="text-blue-600" /> Artikel</h1><p className="mt-1 text-sm text-gray-500">Kelola artikel lama, draft, dan artikel terbit dari satu daftar.</p></div><button onClick={resetEditor} className="btn btn-primary flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold"><Plus size={17} /> Tambah Artikel</button></header>
+
+        {message && <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-700">{message}</div>}
+
+        <section className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+          <div className="border-b border-gray-100 p-5 sm:p-6">
+            <div className="flex flex-wrap gap-4 border-b border-gray-100 pb-4 text-sm font-bold">{[['all', `Semua (${savedArticles.length})`], ['published', `Terbit (${publishedCount})`], ['draft', `Draft (${draftCount})`]].map(([status, label]) => <button key={status} onClick={() => setArticleStatus(status)} className={articleStatus === status ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'}>{label}</button>)}</div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto]"><label className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" /><input value={articleQuery} onChange={(event) => setArticleQuery(event.target.value)} className="clean-input pl-10" placeholder="Cari judul, penulis, atau tag…" /></label><select value={articleCategory} onChange={(event) => setArticleCategory(event.target.value)} className="clean-input"><option value="all">Semua kategori</option>{articleCategories.map((item) => <option key={item} value={item}>{item}</option>)}</select><select value={articleStatus} onChange={(event) => setArticleStatus(event.target.value)} className="clean-input"><option value="all">Semua status</option><option value="published">Terbit</option><option value="draft">Draft</option></select><button onClick={loadArticles} className="btn flex items-center justify-center gap-2 border border-gray-200 px-4 text-sm font-bold text-gray-600"><RefreshCw size={15} className={loadingArticles ? 'animate-spin' : ''} /> Muat ulang</button></div>
+          </div>
+
+          {loadingArticles ? <div className="p-12 text-center text-sm text-gray-400">Memuat artikel…</div> : filteredArticles.length === 0 ? <div className="p-12 text-center"><FileText className="mx-auto text-gray-300" size={38} /><p className="mt-3 text-sm font-bold text-gray-600">Artikel tidak ditemukan.</p></div> : <>
+            <div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-gray-50 text-[11px] font-black uppercase tracking-wide text-gray-500"><tr><th className="px-5 py-4">Judul</th><th className="px-5 py-4">Penulis</th><th className="px-5 py-4">Kategori</th><th className="px-5 py-4">Tag</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Tanggal</th><th className="px-5 py-4 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-gray-100">{filteredArticles.map((article) => <tr key={article.slug} className="hover:bg-blue-50/30"><td className="px-5 py-4"><button onClick={() => editArticle(article)} className="max-w-xs text-left font-black text-blue-700 hover:underline">{article.title?.id || article.title?.en || article.slug}</button><p className="mt-1 max-w-xs truncate text-xs text-gray-400">/{article.slug}</p></td><td className="px-5 py-4 text-gray-600">{article.author || '—'}</td><td className="px-5 py-4 font-semibold text-gray-700">{article.category?.id || '—'}</td><td className="px-5 py-4"><div className="flex max-w-48 flex-wrap gap-1">{(article.tags || []).slice(0, 3).map((tag) => <span key={tag} className="rounded bg-gray-100 px-2 py-1 text-[10px] text-gray-600">{tag}</span>)}</div></td><td className="px-5 py-4"><StatusBadge status={article.status} /></td><td className="px-5 py-4 text-gray-500">{article.date}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => editArticle(article)} className="rounded-lg bg-blue-50 p-2 text-blue-600" title="Edit"><Pencil size={15} /></button><button onClick={() => deleteArticle(article)} className="rounded-lg bg-red-50 p-2 text-red-600" title="Hapus"><Trash2 size={15} /></button></div></td></tr>)}</tbody></table></div>
+            <div className="divide-y divide-gray-100 md:hidden">{filteredArticles.map((article) => <article key={article.slug} className="p-5"><div className="flex items-start justify-between gap-3"><div><button onClick={() => editArticle(article)} className="text-left font-black text-blue-700">{article.title?.id || article.title?.en || article.slug}</button><p className="mt-1 text-xs text-gray-400">{article.author || '—'} · {article.date}</p></div><StatusBadge status={article.status} /></div><p className="mt-3 text-xs font-semibold text-gray-500">{article.category?.id || 'Tanpa kategori'}</p><div className="mt-4 flex gap-2"><button onClick={() => editArticle(article)} className="btn flex flex-1 items-center justify-center gap-2 border border-blue-200 bg-blue-50 py-2 text-xs font-bold text-blue-700"><Pencil size={14} /> Edit</button><button onClick={() => deleteArticle(article)} className="btn border border-red-200 bg-red-50 px-4 text-red-600"><Trash2 size={14} /></button></div></article>)}</div>
+          </>}
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 p-4 sm:p-6">
-      <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 font-display text-lg font-black text-gray-900"><FileText size={19} className="text-blue-600" /> Artikel Tersimpan</h2>
-            <p className="mt-1 text-xs text-gray-500">Pilih artikel lama untuk mengeditnya, atau buat artikel baru.</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={loadArticles} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50"><RefreshCw size={14} /> Muat ulang</button>
-            <button onClick={resetEditor} className="flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700"><Plus size={14} /> Artikel baru</button>
-          </div>
+      <header className="mb-6 flex flex-col gap-4 rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3"><button onClick={() => setView('list')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100" aria-label="Kembali ke daftar artikel"><ArrowLeft size={20} /></button><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Editor Artikel</p><h1 className="truncate font-display text-2xl font-black text-gray-900">{editingSlug ? 'Edit Artikel' : 'Tambah Artikel'}</h1><p className="mt-1 text-sm text-gray-500">Editor halaman penuh, tanpa popup.</p></div></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm shadow-sm"><option value="en">English</option><option value="id">Indonesia</option></select>
+          <button onClick={() => setShowPreview(true)} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium hover:bg-gray-50"><Eye size={16} /> Preview</button>
+          <div className="relative flex"><button disabled={saving} onClick={() => saveArticle('published')} className="rounded-l-xl bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Save size={15} className="mr-1 inline" />{saving ? 'Saving…' : editingSlug ? 'Update' : 'Publish'}</button><button onClick={() => setShowSaveMenu((value) => !value)} className="rounded-r-xl border-l border-blue-700 bg-blue-600 px-3 text-white">▾</button>{showSaveMenu && <div className="absolute right-0 top-12 z-20 w-40 rounded-xl border bg-white p-1 shadow-lg"><button onClick={() => saveArticle('draft')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50">Save as draft</button></div>}</div>
         </div>
-        {loadingArticles ? (
-          <div className="rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Memuat artikel…</div>
-        ) : savedArticles.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 p-5 text-center text-xs text-gray-400">Belum ada artikel di database.</div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {savedArticles.map((article) => (
-              <article key={article.slug} className={`rounded-xl border p-3 transition-colors ${editingSlug === article.slug ? 'border-blue-400 bg-blue-50/50' : 'border-gray-100 bg-gray-50/70'}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-gray-900">{article.title?.id || article.title?.en || article.slug}</p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">{article.status} · {article.date}</p>
-                  </div>
-                  <span className={`rounded-full px-2 py-1 text-[9px] font-black ${article.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{article.status === 'published' ? 'TAYANG' : 'DRAFT'}</span>
-                </div>
-                <div className="mt-3 flex gap-2 border-t border-gray-200 pt-3">
-                  <button onClick={() => editArticle(article)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-bold text-blue-600 shadow-sm hover:bg-blue-50"><Pencil size={13} /> Edit</button>
-                  <button onClick={() => deleteArticle(article)} className="flex items-center justify-center rounded-lg bg-white px-3 py-2 text-red-500 shadow-sm hover:bg-red-50" title="Hapus artikel"><Trash2 size={14} /></button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+      </header>
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6">
         <input
           value={currentTitle}
           onChange={(event) => setTitle((current) => ({ ...current, [language]: event.target.value }))}
-          className="w-full flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 font-bold text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:max-w-2xl"
+          className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 font-bold text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder={language === 'id' ? 'Judul artikel…' : 'Article title…'}
         />
-        <div className="flex items-center gap-2">
-          <select value={language} onChange={(event) => setLanguage(event.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm">
-            <option value="en">English</option>
-            <option value="id">Indonesia</option>
-          </select>
-          <button onClick={() => setShowPreview(true)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"><Eye size={16} /> Preview</button>
-          <div className="relative flex">
-            <button disabled={saving} onClick={() => saveArticle('published')} className="rounded-l-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"><Save size={15} className="mr-1 inline" />{saving ? 'Saving…' : editingSlug ? 'Update' : 'Publish'}</button>
-            <button onClick={() => setShowSaveMenu((value) => !value)} className="rounded-r-lg border-l border-blue-700 bg-blue-600 px-3 text-white">▾</button>
-            {showSaveMenu && <div className="absolute right-0 top-11 z-20 w-40 rounded-xl border bg-white p-1 shadow-lg"><button onClick={() => saveArticle('draft')} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-50">Save as draft</button></div>}
-          </div>
-        </div>
       </div>
 
       {message && <div className={`mb-4 rounded-xl border p-3 text-sm font-semibold ${message.includes('gagal') || message.includes('Isi ') ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>{message}</div>}
@@ -297,7 +307,7 @@ export default function AdminArticlesPage() {
                   </> : <div className="space-y-3">
                     <input ref={(node) => { fileInputs.current[block.id] = node; }} type="file" accept="image/*" className="hidden" onChange={(event) => uploadImage(block.id, event.target.files?.[0])} />
                     <button onClick={() => fileInputs.current[block.id]?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-blue-50/30 p-6 text-sm font-medium text-blue-600"><ImageIcon size={20} /> {block.url ? 'Ganti gambar' : 'Upload a file'}</button>
-                    {block.url && <img src={block.url} alt={block.caption || 'Preview'} className="max-h-64 rounded-xl object-cover" />}
+                    {block.url && <Image src={block.url} alt={block.caption || 'Preview'} width={900} height={540} className="max-h-64 w-auto rounded-xl object-cover" unoptimized />}
                     <input value={block.caption || ''} onChange={(event) => updateBlock(block.id, 'caption', event.target.value)} className="w-full rounded-lg border px-4 py-2" placeholder="Caption" />
                   </div>}
                 </div>
@@ -318,7 +328,10 @@ export default function AdminArticlesPage() {
         </aside>
       </div>
 
-      {showPreview && <div onClick={() => setShowPreview(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><article onClick={(event) => event.stopPropagation()} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-8 shadow-2xl"><button onClick={() => setShowPreview(false)} className="float-right rounded-full bg-gray-100 p-2"><X size={18} /></button><p className="text-xs font-bold uppercase text-blue-600">{category}</p><h1 className="mt-2 text-4xl font-black">{previewTitle}</h1><p className="mt-2 text-sm text-gray-500">{author} · {publishedAt.replace('T', ' ')}</p>{firstImage && <img src={firstImage} alt="Article preview" className="mt-6 max-h-96 w-full rounded-2xl object-cover" />}<div className="mt-6 space-y-5">{blocks.filter((block) => block.type === 'text').map((block) => <section key={block.id}>{block.title && <h2 className="text-2xl font-bold">{block.title}</h2>}<p className="mt-2 whitespace-pre-wrap leading-7 text-gray-700">{block.content}</p></section>)}</div></article></div>}
     </div>
   );
+}
+
+function StatusBadge({ status }) {
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{status === 'published' ? 'Terbit' : 'Draft'}</span>;
 }
