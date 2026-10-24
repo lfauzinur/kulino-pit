@@ -361,11 +361,6 @@ export function bikeRow(row) {
     category: row.category,
     image: row.image,
     imagePublicId: row.image_public_id,
-    gallery: Array.isArray(row.gallery)
-      ? row.gallery
-        .map((item) => typeof item === 'string' ? { url: item, publicId: '' } : item)
-        .filter((item) => item && typeof item.url === 'string' && item.url.trim())
-      : [],
     frameSize: Array.isArray(row.frame_size) ? row.frame_size : (row.frame_size ? JSON.parse(row.frame_size) : ['M']),
     pricePerDay: Number(row.price_per_day),
     price2h: Number(row.price_2h),
@@ -458,6 +453,11 @@ export function tourRow(row) {
     description: { id: row.description_id, en: row.description_en },
     image: row.image,
     imagePublicId: row.image_public_id,
+    gallery: Array.isArray(row.gallery)
+      ? row.gallery
+        .map((item) => typeof item === 'string' ? { url: item, publicId: '' } : item)
+        .filter((item) => item && typeof item.url === 'string' && item.url.trim())
+      : [],
     includes: {
       id: Array.isArray(row.includes_id) ? row.includes_id : [],
       en: Array.isArray(row.includes_en) ? row.includes_en : [],
