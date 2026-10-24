@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, Bike, CalendarDays, CheckCircle2, Clock3, Map, RefreshCw, TrendingUp, Users, WalletCards } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const rupiah = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
 const periods = [
@@ -71,6 +70,21 @@ function StatusPill({ status, count }) {
   return <div className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${color}`}><span className="text-xs font-black uppercase tracking-wide">{status}</span><strong className="text-lg">{count}</strong></div>;
 }
 
+function SeriesBars({ series, dataKey, color = 'bg-blue-500' }) {
+  const maximum = Math.max(1, ...series.map((item) => Number(item[dataKey] || 0)));
+  return <div className="flex h-72 min-w-[620px] items-end gap-2 border-b border-gray-200 px-1 pt-8">
+    {series.map((item) => {
+      const value = Number(item[dataKey] || 0);
+      const height = value ? Math.max(8, Math.round((value / maximum) * 220)) : 3;
+      return <div key={item.key} className="flex h-full min-w-10 flex-1 flex-col items-center justify-end gap-2">
+        <span className="text-[10px] font-black text-gray-600">{value}</span>
+        <div className={`w-full max-w-11 rounded-t-lg transition-all ${value ? color : 'bg-gray-100'}`} style={{ height }} title={`${item.label}: ${value}`} />
+        <span className="h-8 text-center text-[9px] font-semibold leading-3 text-gray-400">{item.label}</span>
+      </div>;
+    })}
+  </div>;
+}
+
 export default function AdminReportsPage() {
   const [data, setData] = useState(null);
   const [period, setPeriod] = useState('day');
@@ -129,8 +143,8 @@ export default function AdminReportsPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <article className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6"><div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500">Laporan Booking</p><h2 className="font-display text-2xl font-black text-gray-900">Booking {periods.find((item) => item.id === period)?.label.toLowerCase()}</h2></div><div className="h-80 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={series} margin={{ left: -20, right: 6 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} /><Tooltip /><Bar dataKey="bookings" name="Booking" fill="#4aa8e8" radius={[8, 8, 0, 0]} maxBarSize={44} /></BarChart></ResponsiveContainer></div><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{data.bookingStatuses.map((item) => <StatusPill key={item.status} {...item} />)}</div></article>
-        <article className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6"><div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-500">Laporan Member</p><h2 className="font-display text-2xl font-black text-gray-900">Member baru</h2><p className="mt-1 text-sm text-gray-500">Pendaftaran member yang tersimpan di database.</p></div><div className="h-80 w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={series} margin={{ left: -20, right: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} /><YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} /><Tooltip /><Line type="monotone" dataKey="members" name="Member baru" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3, fill: '#8b5cf6' }} /></LineChart></ResponsiveContainer></div></article>
+        <article className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6"><div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500">Laporan Booking</p><h2 className="font-display text-2xl font-black text-gray-900">Booking {periods.find((item) => item.id === period)?.label.toLowerCase()}</h2></div><div className="overflow-x-auto"><SeriesBars series={series} dataKey="bookings" /></div><div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{data.bookingStatuses.map((item) => <StatusPill key={item.status} {...item} />)}</div></article>
+        <article className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6"><div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-500">Laporan Member</p><h2 className="font-display text-2xl font-black text-gray-900">Member baru</h2><p className="mt-1 text-sm text-gray-500">Pendaftaran member yang tersimpan di database.</p></div><div className="overflow-x-auto"><SeriesBars series={series} dataKey="members" color="bg-violet-500" /></div></article>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">

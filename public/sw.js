@@ -1,5 +1,5 @@
 // Kulino Pit Service Worker - Progressive Web App
-const CACHE_NAME = 'kulino-pit-v4';
+const CACHE_NAME = 'kulino-pit-v5';
 const PRECACHE_ASSETS = [
   '/',
   '/member',
@@ -36,6 +36,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (!event.request.url.startsWith(self.location.origin)) return;
+  const requestUrl = new URL(event.request.url);
+
+  // Admin and API data must never be served from an old application cache.
+  if (requestUrl.pathname.startsWith('/admin') || requestUrl.pathname.startsWith('/api/')) return;
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/') || caches.match('/member'))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
