@@ -5,6 +5,7 @@ import {
   Eye, Type, Image as ImageIcon, Bold, Italic, List, Grid, Link as LinkIcon,
   Code, Trash2, ArrowDown, ArrowUp, Plus, Save, Pencil, FileText, RefreshCw, Search, ArrowLeft,
 } from 'lucide-react';
+import AdminConfirmPage from '@/components/AdminConfirmPage';
 
 const newTextBlock = () => ({ id: crypto.randomUUID(), type: 'text', title: '', content: '' });
 const newImageBlock = () => ({ id: crypto.randomUUID(), type: 'image', url: '', publicId: '', caption: '' });
@@ -33,6 +34,7 @@ export default function AdminArticlesPage() {
   const [savedArticles, setSavedArticles] = useState([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [editingSlug, setEditingSlug] = useState(null);
+  const [deletingArticle, setDeletingArticle] = useState(null);
   const [view, setView] = useState('list');
   const [articleQuery, setArticleQuery] = useState('');
   const [articleStatus, setArticleStatus] = useState('all');
@@ -105,18 +107,21 @@ export default function AdminArticlesPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const deleteArticle = async (article) => {
-    if (!window.confirm(`Hapus artikel “${article.title?.id || article.slug}”?`)) return;
+  const deleteArticle = async (articleToDelete) => {
+    if (articleToDelete) { setDeletingArticle(articleToDelete); return; }
+    const article = deletingArticle; if (!article) return;
+    setSaving(true);
     try {
       const response = await fetch(`/api/articles/${encodeURIComponent(article.slug)}`, { method: 'DELETE' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Artikel gagal dihapus.');
       if (editingSlug === article.slug) resetEditor();
+      setDeletingArticle(null);
       setMessage('Artikel berhasil dihapus.');
       await loadArticles();
     } catch (error) {
       setMessage(error.message);
-    }
+    } finally { setSaving(false); }
   };
 
   const updateBlock = (id, field, value) => {
@@ -219,6 +224,8 @@ export default function AdminArticlesPage() {
       && (articleStatus === 'all' || article.status === articleStatus)
       && (articleCategory === 'all' || article.category?.id === articleCategory);
   });
+
+  if (deletingArticle) return <AdminConfirmPage title="Hapus Artikel?" description={`Artikel “${deletingArticle.title?.id || deletingArticle.slug}” akan dihapus permanen.`} busy={saving} onCancel={() => setDeletingArticle(null)} onConfirm={deleteArticle} />;
 
   if (showPreview) {
     return (

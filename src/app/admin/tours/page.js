@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ArrowLeft, Database, Edit2, Eye, EyeOff, ImagePlus, Images, Map, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/data';
+import AdminConfirmPage from '@/components/AdminConfirmPage';
 
 const emptyTour = {
   name: '', slug: '', price: '', categoryId: '', duration: '', distance: '', difficultyId: 'Mudah', difficultyEn: 'Easy',
@@ -39,6 +40,7 @@ export default function AdminTours() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [busyId, setBusyId] = useState('');
+  const [deletingItem, setDeletingItem] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   const loadData = useCallback(async () => {
@@ -69,16 +71,23 @@ export default function AdminTours() {
   };
 
   const removeItem = async (type, id) => {
-    if (!window.confirm(`Hapus ${type === 'category' ? 'kategori' : 'paket tour'} ini?`)) return;
-    setBusyId(`${type}-${id}`);
+    if (type && id) { setDeletingItem({ type, id }); return; }
+    const actualType = deletingItem?.type; const actualId = deletingItem?.id; if (!actualType || !actualId) return;
+    setBusyId(`${actualType}-${actualId}`);
     try {
-      await readResponse(await fetch(`/api/admin/tours/${id}?type=${type}`, { method: 'DELETE' }));
-      if (type === 'category') setCategories((items) => items.filter((item) => item.id !== id));
-      else setTours((items) => items.filter((item) => item.id !== id));
+      await readResponse(await fetch(`/api/admin/tours/${actualId}?type=${actualType}`, { method: 'DELETE' }));
+      if (actualType === 'category') setCategories((items) => items.filter((item) => item.id !== actualId));
+      else setTours((items) => items.filter((item) => item.id !== actualId));
+      setDeletingItem(null);
       notify('success', 'Data berhasil dihapus dari database.');
     } catch (error) { notify('error', error.message); }
     finally { setBusyId(''); }
   };
+
+  if (deletingItem) {
+    const label = deletingItem.type === 'category' ? categories.find((item) => item.id === deletingItem.id)?.name : tours.find((item) => item.id === deletingItem.id)?.name?.id;
+    return <AdminConfirmPage title={`Hapus ${deletingItem.type === 'category' ? 'Kategori' : 'Paket Tour'}?`} description={`“${label || 'Data ini'}” akan dihapus permanen dari database.`} busy={Boolean(busyId)} onCancel={() => setDeletingItem(null)} onConfirm={() => removeItem()} />;
+  }
 
   const openAdd = () => {
     setEditingTour(null);

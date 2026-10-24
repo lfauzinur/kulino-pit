@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Users, CheckCircle, XCircle, Clock, MessageCircle, Eye, X, Bike, Phone, MapPin, Hash, FileText, AlertCircle, RefreshCcw } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowLeft, Users, CheckCircle, XCircle, Clock, MessageCircle, Eye, Bike, Phone, MapPin, Hash, FileText, AlertCircle, RefreshCcw } from 'lucide-react';
 
 export default function AdminPartnersPage() {
   const [partners, setPartners] = useState([]);
@@ -10,14 +11,6 @@ export default function AdminPartnersPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState('');
-
-  useEffect(() => {
-    if (!selectedPartner) return undefined;
-    const closeOnEscape = (event) => { if (event.key === 'Escape') setSelectedPartner(null); };
-    document.addEventListener('keydown', closeOnEscape);
-    document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', closeOnEscape); document.body.style.overflow = ''; };
-  }, [selectedPartner]);
 
   const loadPartners = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -97,6 +90,7 @@ export default function AdminPartnersPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
+      {!selectedPartner && <>
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
         <div>
           <h1 className="font-display font-black text-3xl text-gray-900">Partner Applications</h1>
@@ -239,16 +233,22 @@ export default function AdminPartnersPage() {
         {loading && <div className="py-12 text-center text-sm text-gray-500">Memuat pendaftaran dari database…</div>}
       </div>
 
-      {/* ─── Partner Detail Modal ─── */}
+      </>}
+
+      {/* Full-page partner detail */}
       {selectedPartner && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-2 backdrop-blur-sm animate-fade-in sm:p-4" onClick={() => setSelectedPartner(null)}>
-          <div className="relative my-auto max-h-[calc(100dvh-1rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]" onClick={e => e.stopPropagation()}>
+        <div className="space-y-6 animate-fade-in">
+          <header className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <button type="button" onClick={() => setSelectedPartner(null)} className="btn border px-3" aria-label="Kembali ke daftar partner"><ArrowLeft size={18} /></button>
+              <div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-500">Detail Partner</p><h1 className="font-display text-3xl font-black text-gray-900">{selectedPartner.name}</h1><p className="mt-1 text-sm text-gray-500">{selectedPartner.id} · Daftar {selectedPartner.date}</p></div>
+            </div>
+            <span className={`inline-flex items-center gap-1 self-start rounded-full border px-3 py-1 text-xs font-bold sm:self-center ${statusColor(selectedPartner.status)}`}>{statusIcon(selectedPartner.status)} {selectedPartner.status}</span>
+          </header>
+          <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
             
             {/* Header */}
-            <div className="sticky top-0 z-20 bg-gradient-to-r from-[var(--color-primary)] to-sky-500 p-6 rounded-t-3xl relative">
-              <button type="button" onClick={() => setSelectedPartner(null)} className="absolute top-4 right-4 grid h-11 w-11 place-items-center rounded-xl bg-white text-gray-700 shadow-lg transition-colors hover:bg-red-50 hover:text-red-600" aria-label="Tutup detail mitra">
-                <X size={18} />
-              </button>
+            <div className="relative bg-gradient-to-r from-[var(--color-primary)] to-sky-500 p-6">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center font-black text-2xl text-white">
                   {selectedPartner.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
@@ -267,7 +267,7 @@ export default function AdminPartnersPage() {
               {selectedPartner.photoUrl && (
                 <div>
                   <h3 className="text-xs font-black uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2"><Eye size={12} /> Foto Sepeda</h3>
-                  <img src={selectedPartner.photoUrl} alt={`Sepeda ${selectedPartner.name}`} className="h-64 w-full rounded-2xl border border-gray-100 object-cover" />
+                  <div className="relative h-64 w-full overflow-hidden rounded-2xl border border-gray-100"><Image src={selectedPartner.photoUrl} alt={`Sepeda ${selectedPartner.name}`} fill className="object-cover" unoptimized /></div>
                 </div>
               )}
               {/* Profile Info */}

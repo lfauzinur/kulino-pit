@@ -5,6 +5,7 @@ import {
   ArrowLeft, Navigation2, Plus, Trash2, Edit3, Save, X, MapPin, 
   Clock, Mountain, ChevronRight, ToggleLeft, ToggleRight, Bike
 } from 'lucide-react';
+import AdminConfirmPage from '@/components/AdminConfirmPage';
 
 const DIFFICULTY_OPTIONS = ['Pemula', 'Menengah', 'Mahir'];
 const COLOR_OPTIONS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#0EA5E9', '#64748B'];
@@ -13,16 +14,21 @@ export default function AdminRoutesPage() {
   const [routes, setRoutes] = useState([]);
   const [editingRoute, setEditingRoute] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingRoute, setDeletingRoute] = useState(null);
+  const [formError, setFormError] = useState('');
 
   // Load routes from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('kulinoPitRoutes');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) setRoutes(parsed);
-      } catch (e) { /* ignore */ }
-    }
+    const timer = window.setTimeout(() => {
+      const stored = localStorage.getItem('kulinoPitRoutes');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setRoutes(parsed);
+        } catch (e) { /* ignore */ }
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Save routes to localStorage
@@ -31,10 +37,11 @@ export default function AdminRoutesPage() {
     localStorage.setItem('kulinoPitRoutes', JSON.stringify(newRoutes));
   };
 
-  const deleteRoute = (id) => {
-    if (confirm('Hapus rute ini?')) {
-      saveRoutes(routes.filter(r => r.id !== id));
-    }
+  const deleteRoute = (route) => {
+    if (route) { setDeletingRoute(route); return; }
+    if (!deletingRoute) return;
+    saveRoutes(routes.filter(r => r.id !== deletingRoute.id));
+    setDeletingRoute(null);
   };
 
   const toggleActive = (id) => {
@@ -73,9 +80,10 @@ export default function AdminRoutesPage() {
 
   const saveEdit = () => {
     if (!editingRoute.name.trim()) {
-      alert('Nama rute wajib diisi!');
+      setFormError('Nama rute wajib diisi.');
       return;
     }
+    setFormError('');
     
     const cleaned = {
       ...editingRoute,
@@ -124,6 +132,8 @@ export default function AdminRoutesPage() {
   };
 
   // EDITOR VIEW
+  if (deletingRoute) return <AdminConfirmPage title="Hapus Rute?" description={`Rute “${deletingRoute.name || 'Tanpa nama'}” akan dihapus permanen.`} onCancel={() => setDeletingRoute(null)} onConfirm={() => deleteRoute()} />;
+
   if (editingRoute) {
     return (
       <div className="max-w-4xl mx-auto">
@@ -142,6 +152,7 @@ export default function AdminRoutesPage() {
         </div>
 
         <div className="space-y-6">
+          {formError && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{formError}</div>}
           {/* Basic Info */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
             <h3 className="font-bold text-sm text-gray-900 flex items-center gap-2">
@@ -396,7 +407,7 @@ export default function AdminRoutesPage() {
                   <Edit3 size={16} />
                 </button>
                 <button
-                  onClick={() => deleteRoute(route.id)}
+                  onClick={() => deleteRoute(route)}
                   className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                   title="Hapus"
                 >

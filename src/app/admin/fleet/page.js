@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { formatCurrency } from '@/lib/data';
 import Image from 'next/image';
-import { Bike, Search, Settings, CheckCircle, XCircle, Flame, Trash2, Upload, ImageIcon, RefreshCw, Database, ArrowUpFromLine, Boxes } from 'lucide-react';
+import { ArrowLeft, Bike, Search, Settings, CheckCircle, XCircle, Flame, Trash2, Upload, ImageIcon, RefreshCw, Database, ArrowUpFromLine, Boxes } from 'lucide-react';
 
 async function readApiResponse(response) {
   const data = await response.json().catch(() => ({}));
@@ -51,15 +51,14 @@ export default function AdminFleetPage() {
   const handleMigrateFromLocalStorage = async () => {
     const saved = localStorage.getItem('customBikes');
     if (!saved) {
-      alert('Tidak ada data sepeda di browser ini.');
+      setOperationError('Tidak ada data sepeda lama di browser ini.');
       return;
     }
     const bikes = JSON.parse(saved);
     if (!bikes.length) {
-      alert('Data kosong.');
+      setOperationError('Data sepeda lama kosong.');
       return;
     }
-    if (!confirm(`Migrate ${bikes.length} sepeda dari browser ini ke database? Data yang sama akan di-update.`)) return;
     
     setMigrating(true);
     try {
@@ -68,12 +67,12 @@ export default function AdminFleetPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bikes }),
       });
-      const data = await readApiResponse(res);
-      alert(`Berhasil! ${data.results.length} sepeda sudah dipindahkan ke database.`);
+      await readApiResponse(res);
+      setOperationError('');
       await fetchBikes();
       localStorage.removeItem('customBikes'); // bersihkan localStorage lama
     } catch (err) {
-      alert('Error: ' + err.message);
+      setOperationError(`Migrasi gagal: ${err.message}`);
     } finally {
       setMigrating(false);
     }
@@ -248,6 +247,7 @@ export default function AdminFleetPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
+      {!deletingId && !editingBike && <>
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
         <div>
           <h1 className="font-display font-black text-3xl text-gray-900">Fleet Management</h1>
@@ -458,10 +458,16 @@ export default function AdminFleetPage() {
         </div>
       )}
 
-      {/* Delete Confirm Modal */}
+      </>}
+
+      {/* Delete confirmation page */}
       {deletingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl text-center">
+        <div className="space-y-6 animate-fade-in">
+          <header className="flex items-start gap-3 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+            <button type="button" onClick={() => setDeletingId(null)} className="btn border px-3" aria-label="Kembali ke daftar sepeda"><ArrowLeft size={18} /></button>
+            <div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-red-500">Konfirmasi penghapusan</p><h1 className="font-display text-3xl font-black text-gray-900">Hapus Sepeda</h1><p className="mt-1 text-sm text-gray-500">Periksa unit sebelum menghapusnya permanen dari database.</p></div>
+          </header>
+          <div className="rounded-3xl border border-red-100 bg-white p-8 text-center shadow-sm">
             <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
               <Trash2 size={24} className="text-red-500" />
             </div>
@@ -474,9 +480,9 @@ export default function AdminFleetPage() {
                 {operationError}
               </div>
             )}
-            <div className="flex gap-3">
-              <button disabled={deleting} onClick={() => setDeletingId(null)} className="btn flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">Batal</button>
-              <button disabled={deleting} onClick={() => handleDeleteBike(deletingId)} className="btn flex-1 bg-red-500 hover:bg-red-600 text-white disabled:opacity-50">
+            <div className="mx-auto flex max-w-xl gap-3">
+              <button disabled={deleting} onClick={() => setDeletingId(null)} className="btn flex-1 border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">Kembali</button>
+              <button disabled={deleting} onClick={() => handleDeleteBike(deletingId)} className="btn flex-1 bg-red-500 text-white hover:bg-red-600 disabled:opacity-50">
                 {deleting ? 'Menghapus...' : 'Hapus'}
               </button>
             </div>
@@ -484,28 +490,24 @@ export default function AdminFleetPage() {
         </div>
       )}
 
-      {/* Edit / Add Bike Modal */}
+      {/* Full-page bike editor */}
       {editingBike && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col">
-            {/* Modal Header dengan tombol X */}
-            <div className="flex items-start justify-between p-6 pb-0">
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <button type="button" onClick={() => setEditingBike(null)} className="btn border px-3" aria-label="Kembali ke daftar sepeda"><ArrowLeft size={18} /></button>
               <div>
-                <h3 className="font-display font-black text-xl text-gray-900">{editingBike.id ? 'Edit Bike' : 'Add New Bike'}</h3>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-500">Editor Fleet</p>
+                <h3 className="font-display font-black text-3xl text-gray-900">{editingBike.id ? 'Edit Bike' : 'Add New Bike'}</h3>
                 <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                   <Database size={11} /> Tersimpan otomatis ke database
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditingBike(null)}
-                className="ml-4 mt-1 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
-              >
-                <span className="text-xl leading-none">&times;</span>
-              </button>
             </div>
-            <div className="overflow-y-auto p-6 pt-4">
-            <form onSubmit={handleEditSave} className="space-y-4">
+            <button type="submit" form="fleet-editor-form" disabled={saving || uploading} className="btn btn-primary flex items-center justify-center gap-2 px-6"><Database size={15} />{saving ? 'Menyimpan…' : 'Simpan ke Database'}</button>
+          </div>
+          <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+            <form id="fleet-editor-form" onSubmit={handleEditSave} className="mx-auto max-w-5xl space-y-4">
 
               {operationError && (
                 <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
@@ -522,7 +524,7 @@ export default function AdminFleetPage() {
                 >
                   {editingBike.image ? (
                     <>
-                      <img src={editingBike.image} alt="Preview" className="w-full h-full object-contain p-2" />
+                      <Image src={editingBike.image} alt="Preview" fill className="object-contain p-2" unoptimized />
                       {uploading && (
                         <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-2">
                           <div className="w-8 h-8 border-[3px] border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
@@ -679,7 +681,6 @@ export default function AdminFleetPage() {
             </form>
             </div>
           </div>
-        </div>
       )}
     </div>
   );

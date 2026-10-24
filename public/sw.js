@@ -1,5 +1,5 @@
 // Kulino Pit Service Worker - Progressive Web App
-const CACHE_NAME = 'kulino-pit-v2';
+const CACHE_NAME = 'kulino-pit-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/member',

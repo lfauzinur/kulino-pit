@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/data';
-import { CalendarDays, Search, Filter, ChevronDown, Settings, X } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Search, Settings } from 'lucide-react';
 
 export default function AdminBookingsPage() {
   const [filter, setFilter] = useState('All');
@@ -82,6 +82,7 @@ export default function AdminBookingsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
+      {!selectedBooking && <>
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
         <div>
           <h1 className="font-display font-black text-3xl text-gray-900">Bookings Management</h1>
@@ -215,16 +216,12 @@ export default function AdminBookingsPage() {
         {loading && <div className="py-12 text-center text-sm text-gray-500">Memuat booking dari database…</div>}
       </div>
 
+      </>}
+
       {selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}>
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Booking Detail</p>
-                <h2 className="font-display text-xl font-black text-gray-900">{selectedBooking.id}</h2>
-              </div>
-              <button type="button" onClick={() => setSelectedBooking(null)} className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200" aria-label="Tutup detail booking"><X size={16} /></button>
-            </div>
+        <div className="space-y-6 animate-fade-in">
+          <header className="flex flex-col gap-4 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><button type="button" onClick={() => setSelectedBooking(null)} className="btn border px-3" aria-label="Kembali ke daftar booking"><ArrowLeft size={18} /></button><div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-500">Booking Detail</p><h1 className="font-display text-3xl font-black text-gray-900">{selectedBooking.id}</h1><p className="mt-1 text-sm text-gray-500">Data pemesanan dan pembayaran pelanggan.</p></div></div><span className={`self-start rounded-lg px-3 py-1 text-xs font-bold sm:self-center ${statusColor(selectedBooking.status)}`}>{selectedBooking.status}</span></header>
+          <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="grid grid-cols-2 gap-3">
               {[
                 ['Customer', selectedBooking.user],

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, ImagePlus, Pencil, Plus, Power, QrCode, Save, Trash2 } from 'lucide-react';
+import AdminConfirmPage from '@/components/AdminConfirmPage';
 
 const blankMethod = {
   type: 'bank',
@@ -29,6 +30,7 @@ export default function AdminPaymentsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [form, setForm] = useState(blankMethod);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -113,17 +115,21 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const deleteMethod = async (method) => {
-    if (!window.confirm(`Hapus metode pembayaran “${method.name}”?`)) return;
+  const deleteMethod = async () => {
+    const method = deleting; if (!method) return;
+    setSaving(true);
     setMessage({ type: '', text: '' });
     try {
       await readJson(await fetch(`/api/payment-methods/${encodeURIComponent(method.id)}`, { method: 'DELETE' }));
       setMethods((current) => current.filter((item) => item.id !== method.id));
+      setDeleting(null);
       setMessage({ type: 'success', text: `Metode “${method.name}” berhasil dihapus.` });
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
-    }
+    } finally { setSaving(false); }
   };
+
+  if (deleting) return <AdminConfirmPage title="Hapus Metode Pembayaran?" description={`Metode “${deleting.name}” akan dihapus dari pilihan booking.`} busy={saving} onCancel={() => setDeleting(null)} onConfirm={deleteMethod} />;
 
   if (editing) {
     return (
@@ -208,7 +214,7 @@ export default function AdminPaymentsPage() {
               <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-4">
                 <button onClick={() => toggleMethod(method)} className="btn flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600"><Power size={14} /> {method.active ? 'Nonaktifkan' : 'Aktifkan'}</button>
                 <button onClick={() => openEdit(method)} className="btn flex items-center gap-2 border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"><Pencil size={14} /> Edit</button>
-                <button onClick={() => deleteMethod(method)} className="btn flex items-center gap-2 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"><Trash2 size={14} /> Hapus</button>
+                <button onClick={() => setDeleting(method)} className="btn flex items-center gap-2 bg-red-50 px-3 py-2 text-xs font-bold text-red-600"><Trash2 size={14} /> Hapus</button>
               </div>
             </article>
           ))}
