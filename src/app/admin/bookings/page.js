@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/data';
 import { ArrowLeft, CalendarDays, Search, Settings } from 'lucide-react';
+import AdminConfirmPage from '@/components/AdminConfirmPage';
 
 export default function AdminBookingsPage() {
   const [filter, setFilter] = useState('All');
@@ -12,8 +13,9 @@ export default function AdminBookingsPage() {
   const [success, setSuccess] = useState('');
   const [updatingId, setUpdatingId] = useState('');
   const [selectedBooking, setSelectedBooking] = useState(null);
-  const [summary, setSummary] = useState({ total: 0, pending: 0, active: 0, completed: 0, cancelled: 0, revenue: 0 });
-  const filters = ['All', 'Pending', 'Active', 'Completed', 'Cancelled'];
+  const [returningBooking, setReturningBooking] = useState(null);
+  const [summary, setSummary] = useState({ total: 0, pending: 0, active: 0, returned: 0, completed: 0, cancelled: 0, revenue: 0 });
+  const filters = ['All', 'Pending', 'Active', 'Returned', 'Cancelled'];
   const [allBookings, setAllBookings] = useState([]);
   const filtered = allBookings.filter((booking) => {
     const matchesFilter = filter === 'All' || booking.status === filter;
@@ -63,8 +65,10 @@ export default function AdminBookingsPage() {
       if (selectedBooking?.id === id) setSelectedBooking(updated);
       setSuccess(`Booking ${id} berhasil diubah menjadi ${newStatus}.`);
       await loadBookings({ silent: true });
+      return true;
     } catch (requestError) {
       setError(requestError.message);
+      return false;
     } finally {
       setUpdatingId('');
     }
@@ -75,10 +79,13 @@ export default function AdminBookingsPage() {
       case 'Pending': return 'bg-amber-50 text-amber-600';
       case 'Active': return 'bg-blue-50 text-blue-600';
       case 'Completed': return 'bg-green-50 text-green-600';
+      case 'Returned': return 'bg-green-50 text-green-700';
       case 'Cancelled': return 'bg-red-50 text-red-600';
       default: return 'bg-gray-50 text-gray-600';
     }
   };
+
+  if (returningBooking) return <AdminConfirmPage eyebrow="Konfirmasi pengembalian" title="Unit Sudah Dikembalikan?" description={`Pastikan unit “${returningBooking.bike}” dari booking ${returningBooking.id} sudah diterima dan diperiksa. Setelah dikonfirmasi, stok unit otomatis tersedia kembali untuk disewa.${error ? ` Gagal: ${error}` : ''}`} busy={updatingId === returningBooking.id} tone="return" confirmLabel="Ya, Unit Sudah Kembali" onCancel={() => setReturningBooking(null)} onConfirm={async () => { if (await handleUpdateStatus(returningBooking.id, 'Returned')) setReturningBooking(null); }} />;
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
@@ -139,7 +146,7 @@ export default function AdminBookingsPage() {
           { label: 'Total', count: summary.total, color: 'bg-gray-50' },
           { label: 'Pending', count: summary.pending, color: 'bg-amber-50' },
           { label: 'Active', count: summary.active, color: 'bg-blue-50' },
-          { label: 'Revenue', count: formatCurrency(summary.revenue), color: 'bg-green-50', sub: 'Active + Completed' },
+          { label: 'Revenue', count: formatCurrency(summary.revenue), color: 'bg-green-50', sub: 'Active + Returned' },
         ].map((stat, i) => (
           <div key={i} className={`${stat.color} rounded-2xl p-4 border border-gray-100`}>
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{stat.label}</p>
@@ -197,7 +204,7 @@ export default function AdminBookingsPage() {
                         </>
                       )}
                       {b.status === 'Active' && (
-                        <button type="button" disabled={updatingId === b.id} onClick={() => handleUpdateStatus(b.id, 'Completed')} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all disabled:opacity-50">Complete</button>
+                        <button type="button" disabled={updatingId === b.id} onClick={() => setReturningBooking(b)} className="px-3 py-1.5 text-[10px] font-semibold rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-all disabled:opacity-50">Konfirmasi Kembali</button>
                       )}
                       <button type="button" onClick={() => setSelectedBooking(b)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors" title="View Details">
                         👁️
@@ -237,6 +244,7 @@ export default function AdminBookingsPage() {
                 ['Alamat', selectedBooking.deliveryAddress || '-'],
                 ['Pembayaran', selectedBooking.paymentMethod || '-'],
                 ['Total', formatCurrency(selectedBooking.total)],
+                ['Dikembalikan', selectedBooking.returnedAt ? new Date(selectedBooking.returnedAt).toLocaleString('id-ID') : '-'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl bg-gray-50 p-3">
                   <p className="text-[9px] font-bold uppercase text-gray-400">{label}</p>

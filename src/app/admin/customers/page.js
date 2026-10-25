@@ -17,6 +17,7 @@ function statusClass(status) {
     Pending: 'bg-amber-50 text-amber-700',
     Active: 'bg-blue-50 text-blue-700',
     Completed: 'bg-green-50 text-green-700',
+    Returned: 'bg-emerald-50 text-emerald-700',
     Cancelled: 'bg-red-50 text-red-700',
   }[status] || 'bg-gray-100 text-gray-600';
 }

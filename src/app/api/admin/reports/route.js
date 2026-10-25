@@ -20,7 +20,7 @@ export async function GET() {
       sql`
         SELECT
           (SELECT COUNT(*) FROM bookings)::int AS bookings,
-          (SELECT COALESCE(SUM(total_amount), 0) FROM bookings WHERE status IN ('Active', 'Completed'))::bigint AS revenue,
+          (SELECT COALESCE(SUM(total_amount), 0) FROM bookings WHERE status IN ('Active', 'Completed', 'Returned'))::bigint AS revenue,
           (SELECT COUNT(*) FROM members)::int AS members,
           (SELECT COUNT(*) FROM partner_applications)::int AS partners,
           (SELECT COUNT(*) FROM partner_applications WHERE status = 'Approved')::int AS approved_partners,

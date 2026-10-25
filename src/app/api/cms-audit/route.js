@@ -93,8 +93,8 @@ export async function GET(request) {
           (SELECT COUNT(*) FROM bookings)::int AS bookings,
           (SELECT COUNT(*) FROM partner_applications)::int AS partners,
           (SELECT COUNT(*) FROM articles)::int AS articles,
-          (SELECT COUNT(*) FROM bookings WHERE status IN ('Active', 'Completed'))::int AS paid_bookings,
-          (SELECT COALESCE(SUM(total_amount), 0) FROM bookings WHERE status IN ('Active', 'Completed'))::bigint AS revenue
+          (SELECT COUNT(*) FROM bookings WHERE status IN ('Active', 'Completed', 'Returned'))::int AS paid_bookings,
+          (SELECT COALESCE(SUM(total_amount), 0) FROM bookings WHERE status IN ('Active', 'Completed', 'Returned'))::bigint AS revenue
       `,
       sql`SELECT id, booking_code, customer_name, status, updated_at FROM bookings ORDER BY updated_at DESC LIMIT 8`,
       sql`SELECT id, application_code, name, status, updated_at FROM partner_applications ORDER BY updated_at DESC LIMIT 8`,

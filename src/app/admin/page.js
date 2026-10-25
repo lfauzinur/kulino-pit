@@ -37,7 +37,7 @@ export default function AdminOverviewPage() {
   const totalFleetUnits = bikes.reduce((sum, bike) => sum + (bike.stockCount || 0), 0);
   const availableFleetUnits = bikes.reduce((sum, bike) => sum + (bike.available ? (bike.availableStock || 0) : 0), 0);
   const revenue = bookings
-    .filter((booking) => ['Active', 'Completed'].includes(booking.status))
+    .filter((booking) => ['Active', 'Completed', 'Returned'].includes(booking.status))
     .reduce((sum, booking) => sum + booking.total, 0);
 
   const stats = [

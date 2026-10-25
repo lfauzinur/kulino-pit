@@ -86,7 +86,7 @@ export async function GET() {
       bookingCount: customer.bookings.length,
       totalTransaction: customer.bookings.reduce((sum, booking) => sum + Number(booking.total || 0), 0),
       paidTransaction: customer.bookings
-        .filter((booking) => ['Active', 'Completed'].includes(booking.status))
+        .filter((booking) => ['Active', 'Completed', 'Returned'].includes(booking.status))
         .reduce((sum, booking) => sum + Number(booking.total || 0), 0),
     })).sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt));
 

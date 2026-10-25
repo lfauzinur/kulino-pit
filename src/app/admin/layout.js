@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { I18nProvider } from '@/lib/i18n';
-import { LayoutDashboard, CalendarDays, Bike, Users, UserRound, FileText, LogOut, ShieldAlert, RotateCcw, Map, BarChart3, Navigation2, Menu, X, BriefcaseBusiness, Images, PanelsTopLeft, CreditCard } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bike, Users, UserRound, FileText, LogOut, ShieldAlert, RotateCcw, Map, BarChart3, Navigation2, Menu, X, BriefcaseBusiness, Images, PanelsTopLeft, CreditCard, PanelBottom } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
@@ -72,6 +72,7 @@ export default function AdminLayout({ children }) {
     { href: '/admin/content-cards', label: 'Paket & Manpower', icon: <PanelsTopLeft size={20} /> },
     { href: '/admin/gallery', label: 'Galeri', icon: <Images size={20} /> },
     { href: '/admin/routes', label: 'Rute Gowes', icon: <Navigation2 size={20} /> },
+    { href: '/admin/footer', label: 'Footer', icon: <PanelBottom size={20} /> },
     { href: '/admin/spin-prizes', label: 'Spin Prizes', icon: <RotateCcw size={20} /> },
   ];
 

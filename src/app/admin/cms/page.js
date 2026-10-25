@@ -62,7 +62,7 @@ function buildSeries(data, period) {
 }
 
 function StatusPill({ status, count }) {
-  const color = status === 'Completed' || status === 'Approved' || status === 'Active'
+  const color = status === 'Completed' || status === 'Returned' || status === 'Approved' || status === 'Active'
     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
     : status === 'Rejected' || status === 'Cancelled'
       ? 'border-red-200 bg-red-50 text-red-700'

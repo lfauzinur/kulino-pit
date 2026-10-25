@@ -1,116 +1,50 @@
 'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Camera, Clock, Link2, MapPin, MessageCircle, Phone } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { MapPin, Phone, Clock } from 'lucide-react';
+import { footerDefaultItems, footerDefaults } from '@/lib/footer-defaults';
+
+const initialItems = footerDefaultItems.map(([group, id, en, url, icon, sortOrder], index) => ({ id: `default-${index}`, group, label: { id, en }, url, icon, sortOrder, published: true }));
+const iconMap = { 'map-pin': MapPin, phone: Phone, clock: Clock, instagram: Camera, 'message-circle': MessageCircle, link: Link2 };
+
+function FooterLink({ href, children, className }) {
+  if (!href) return <span className={className}>{children}</span>;
+  if (href.startsWith('/')) return <Link href={href} className={className}>{children}</Link>;
+  return <a href={href} className={className} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined}>{children}</a>;
+}
 
 export default function Footer() {
-  const { t } = useI18n();
+  const { locale } = useI18n();
+  const [data, setData] = useState({ settings: footerDefaults, items: initialItems });
+  useEffect(() => {
+    let active = true;
+    fetch('/api/footer', { cache: 'no-store' }).then((response) => response.ok ? response.json() : Promise.reject()).then((value) => { if (active) setData(value); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+  const s = data.settings || footerDefaults;
+  const label = (value) => value?.[locale] || value?.id || '';
+  const grouped = (group) => data.items.filter((item) => item.group === group && item.published !== false);
 
-  return (
-    <footer className="bg-gray-50 pt-16 pb-8 border-t border-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Top CTA Banner */}
-        <div className="bg-[var(--color-primary)] rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between text-white shadow-[var(--shadow-soft)] mb-16 transform transition-transform hover:-translate-y-1">
-          <div className="mb-6 md:mb-0 max-w-lg">
-            <h2 className="font-display font-black text-3xl md:text-4xl mb-2">{t('footer.ctaTitle')}</h2>
-            <p className="text-white/90 text-sm md:text-base">{t('footer.ctaDesc')}</p>
-          </div>
-          <div className="flex gap-4">
-            <Link href="/unit-sepeda" className="bg-white text-[var(--color-primary)] px-8 py-3 rounded-full font-bold shadow-md hover:bg-gray-50 transition-colors whitespace-nowrap">
-              {t('footer.ctaBtn')}
-            </Link>
-          </div>
+  return <footer className="border-t border-gray-100 bg-gray-50 pb-8 pt-16">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      {s.showCta !== false && <div className="mb-16 flex flex-col items-center justify-between rounded-3xl bg-[var(--color-primary)] p-8 text-white shadow-[var(--shadow-soft)] transition-transform hover:-translate-y-1 md:flex-row md:p-12">
+        <div className="mb-6 max-w-lg md:mb-0"><h2 className="mb-2 font-display text-3xl font-black md:text-4xl">{label(s.ctaTitle)}</h2><p className="text-sm text-white/90 md:text-base">{label(s.ctaDescription)}</p></div>
+        <FooterLink href={s.ctaUrl} className="whitespace-nowrap rounded-full bg-white px-8 py-3 font-bold text-[var(--color-primary)] shadow-md transition-colors hover:bg-gray-50">{label(s.ctaButton)}</FooterLink>
+      </div>}
+
+      <div className="mb-12 grid grid-cols-1 gap-12 md:grid-cols-4">
+        <div className="space-y-4">
+          <Link href="/" className="group flex items-center gap-3"><div className="relative h-12 w-12 transition-transform group-hover:scale-105"><Image src="/images/logo.png" alt="Kulino Ngepit Logo" fill className="object-contain" /></div><div><strong className="block font-display text-lg font-black leading-none text-gray-900 transition-colors group-hover:text-[var(--color-primary)]">{s.brandName}</strong><span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{s.tagline}</span></div></Link>
+          <p className="text-sm leading-relaxed text-gray-600">{label(s.description)}</p>
+          <div className="flex flex-wrap gap-3 pt-2">{grouped('social').map((item) => <FooterLink key={item.id} href={item.url} className="flex h-10 min-w-10 items-center justify-center rounded-full border border-gray-200 bg-white px-3 text-xs font-bold text-gray-600 transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]">{item.label.id}</FooterLink>)}</div>
         </div>
-
-        {/* Footer Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-          
-          {/* Brand Info */}
-          <div className="md:col-span-1 space-y-4">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative w-12 h-12 transition-transform group-hover:scale-105">
-                <Image 
-                  src="/images/logo.png" 
-                  alt="Kulino Ngepit Logo" 
-                  fill 
-                  className="object-contain" 
-                />
-              </div>
-              <div>
-                <strong className="block font-display text-lg font-black leading-none text-gray-900 group-hover:text-[var(--color-primary)] transition-colors">Kulino Pit</strong>
-                <span className="text-[10px] font-bold text-gray-500 tracking-widest uppercase">Ora Usah Spanneng</span>
-              </div>
-            </Link>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {t('footer.desc')}
-            </p>
-            <div className="flex gap-4 pt-2">
-              <a href="#" className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] transition-colors font-bold text-xs">
-                IG
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-[var(--color-primary)] hover:border-[var(--color-primary)] transition-colors font-bold text-xs">
-                WA
-              </a>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="font-display font-bold text-gray-900 mb-6">{t('footer.navTitle')}</h3>
-            <ul className="space-y-3">
-              <li><Link href="/" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('nav.home')}</Link></li>
-              <li><Link href="/unit-sepeda" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('nav.bikes')}</Link></li>
-              <li><Link href="/layanan" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('nav.services')}</Link></li>
-              <li><Link href="/trip-tour" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('nav.tripTour')}</Link></li>
-              <li><Link href="/routes" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('nav.routes')}</Link></li>
-              <li><Link href="/artikel" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('nav.articles')}</Link></li>
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <h3 className="font-display font-bold text-gray-900 mb-6">{t('footer.helpTitle')}</h3>
-            <ul className="space-y-3">
-              <li><Link href="/tentang" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('footer.links.about')}</Link></li>
-              <li><Link href="/lokasi" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('footer.links.location')}</Link></li>
-              <li><Link href="/syarat-ketentuan" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('footer.links.terms')}</Link></li>
-              <li><Link href="/kebijakan-privasi" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('footer.links.privacy')}</Link></li>
-              <li><Link href="/faq" className="text-sm text-gray-600 hover:text-[var(--color-primary)] transition-colors">{t('footer.links.faq')}</Link></li>
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h3 className="font-display font-bold text-gray-900 mb-6">{t('footer.contactTitle')}</h3>
-            <ul className="space-y-4">
-              <li className="flex items-start gap-3 text-sm text-gray-600">
-                <MapPin className="mt-0.5 text-gray-400 shrink-0" size={18} />
-                <span>Jl Kapten Waroka No 08 Tukangkayu Banyuwangi, Jawa Timur</span>
-              </li>
-              <li className="flex items-center gap-3 text-sm text-gray-600">
-                <Phone className="text-gray-400 shrink-0" size={18} />
-                <span>0811-3000-000</span>
-              </li>
-              <li className="flex items-center gap-3 text-sm text-gray-600">
-                <Clock className="text-gray-400 shrink-0" size={18} />
-                <span>{t('footer.openHours')}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Bottom */}
-        <div className="pt-8 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-gray-500 font-medium">
-            &copy; {new Date().getFullYear()} Kulino Pit by Kulino House. All rights reserved.
-          </p>
-          <div className="flex gap-4">
-            <span className="text-xs text-gray-400">{t('footer.madeWith')}</span>
-          </div>
-        </div>
+        {['navigation', 'help'].map((group) => <div key={group}><h3 className="mb-6 font-display font-bold text-gray-900">{label(s.sectionTitles?.[group])}</h3><ul className="space-y-3">{grouped(group).map((item) => <li key={item.id}><FooterLink href={item.url} className="text-sm text-gray-600 transition-colors hover:text-[var(--color-primary)]">{label(item.label)}</FooterLink></li>)}</ul></div>)}
+        <div><h3 className="mb-6 font-display font-bold text-gray-900">{label(s.sectionTitles?.contact)}</h3><ul className="space-y-4">{grouped('contact').map((item) => { const Icon = iconMap[item.icon] || Link2; return <li key={item.id}><FooterLink href={item.url} className="flex items-start gap-3 text-sm text-gray-600 transition-colors hover:text-[var(--color-primary)]"><Icon className="mt-0.5 shrink-0 text-gray-400" size={18} /><span>{label(item.label)}</span></FooterLink></li>; })}</ul></div>
       </div>
-    </footer>
-  );
+      <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-200 pt-8 md:flex-row"><p className="text-xs font-medium text-gray-500">&copy; {new Date().getFullYear()} {s.copyright}</p><span className="text-xs text-gray-400">{label(s.madeWith)}</span></div>
+    </div>
+  </footer>;
 }

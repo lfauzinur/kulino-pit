@@ -568,7 +568,7 @@ export default function AdminFleetPage() {
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
                 <label className="mb-1 flex items-center gap-2 text-xs font-bold text-blue-800"><Boxes size={15} /> Jumlah Stok / Unit</label>
                 <input type="number" min="0" step="1" required className="clean-input !border-blue-200 bg-white" value={editingBike.stockCount ?? 1} onChange={(event) => setEditingBike({ ...editingBike, stockCount: Math.max(0, Number.parseInt(event.target.value, 10) || 0) })} />
-                <p className="mt-2 text-[10px] leading-4 text-blue-600">Unit tersedia dihitung otomatis dari stok total dikurangi booking berstatus Active.</p>
+                <p className="mt-2 text-[10px] leading-4 text-blue-600">Unit tersedia dihitung otomatis dari stok total dikurangi booking berstatus Active. Stok kembali setelah Admin mengonfirmasi pengembalian.</p>
               </div>
 
               {/* Pricing Tiers */}

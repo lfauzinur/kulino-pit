@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { resolveSocialMedia } from '@/lib/social-media';
+import { footerDefaults, footerDefaultItems } from '@/lib/footer-defaults';
 
 export const sql = neon(process.env.DATABASE_URL);
 
@@ -86,6 +87,7 @@ export function ensureAppDatabase() {
       await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS address TEXT DEFAULT ''`;
 
       await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method_id TEXT DEFAULT ''`;
+      await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS returned_at TIMESTAMPTZ`;
 
       await sql`ALTER TABLE partner_applications ADD COLUMN IF NOT EXISTS photo_public_id TEXT`;
 
@@ -124,6 +126,40 @@ export function ensureAppDatabase() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS footer_items (
+          id BIGSERIAL PRIMARY KEY,
+          group_key TEXT NOT NULL,
+          label_id TEXT NOT NULL,
+          label_en TEXT NOT NULL DEFAULT '',
+          url TEXT NOT NULL DEFAULT '',
+          icon TEXT NOT NULL DEFAULT 'link',
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          published BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `;
+      await sql`
+        INSERT INTO app_settings (key, value)
+        VALUES ('footer_settings_v1', ${JSON.stringify(footerDefaults)}::jsonb)
+        ON CONFLICT (key) DO NOTHING
+      `;
+      const footerSeedMarker = await sql`
+        INSERT INTO app_settings (key, value)
+        VALUES ('footer_items_seeded_v1', '{"completed":true}'::jsonb)
+        ON CONFLICT (key) DO NOTHING
+        RETURNING key
+      `;
+      if (footerSeedMarker.length) {
+        for (const [group, labelId, labelEn, url, icon, sortOrder] of footerDefaultItems) {
+          await sql`
+            INSERT INTO footer_items (group_key, label_id, label_en, url, icon, sort_order)
+            VALUES (${group}, ${labelId}, ${labelEn}, ${url}, ${icon}, ${sortOrder})
+          `;
+        }
+      }
 
       await sql`ALTER TABLE bikes ADD COLUMN IF NOT EXISTS stock_count INTEGER NOT NULL DEFAULT 1`;
       await sql`UPDATE bikes SET stock_count = 1 WHERE stock_count IS NULL OR stock_count < 0`;
@@ -337,6 +373,7 @@ export function ensureAppDatabase() {
       await sql`CREATE INDEX IF NOT EXISTS gallery_items_sort_idx ON gallery_items (published, sort_order, id)`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS content_cards_section_title_idx ON content_cards (section_key, LOWER(title_id))`;
       await sql`CREATE INDEX IF NOT EXISTS content_cards_sort_idx ON content_cards (section_key, published, sort_order, id)`;
+      await sql`CREATE INDEX IF NOT EXISTS footer_items_sort_idx ON footer_items (group_key, published, sort_order, id)`;
     })().catch((error) => {
       schemaPromise = undefined;
       throw error;
@@ -367,7 +404,20 @@ export function bookingRow(row) {
     total: row.total_amount,
     status: row.status,
     activeSince: row.active_since ? new Date(row.active_since).getTime() : null,
+    returnedAt: row.returned_at ? new Date(row.returned_at).getTime() : null,
     createdAt: row.created_at,
+  };
+}
+
+export function footerItemRow(row) {
+  return {
+    id: Number(row.id),
+    group: row.group_key,
+    label: { id: row.label_id, en: row.label_en || row.label_id },
+    url: row.url || '',
+    icon: row.icon || 'link',
+    sortOrder: Number(row.sort_order || 0),
+    published: Boolean(row.published),
   };
 }
 

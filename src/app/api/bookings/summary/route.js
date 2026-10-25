@@ -18,9 +18,10 @@ export async function GET() {
         COUNT(*) FILTER (WHERE status = 'Pending')::int AS pending,
         COUNT(*) FILTER (WHERE status = 'Active')::int AS active,
         COUNT(*) FILTER (WHERE status = 'Completed')::int AS completed,
+        COUNT(*) FILTER (WHERE status = 'Returned')::int AS returned,
         COUNT(*) FILTER (WHERE status = 'Cancelled')::int AS cancelled,
-        COALESCE(SUM(total_amount) FILTER (WHERE status IN ('Active', 'Completed')), 0)::bigint AS revenue,
-        COALESCE(SUM(total_amount) FILTER (WHERE status = 'Completed'), 0)::bigint AS completed_revenue
+        COALESCE(SUM(total_amount) FILTER (WHERE status IN ('Active', 'Completed', 'Returned')), 0)::bigint AS revenue,
+        COALESCE(SUM(total_amount) FILTER (WHERE status IN ('Completed', 'Returned')), 0)::bigint AS completed_revenue
       FROM bookings
     `;
     const row = rows[0];
@@ -29,10 +30,11 @@ export async function GET() {
       pending: Number(row.pending),
       active: Number(row.active),
       completed: Number(row.completed),
+      returned: Number(row.returned),
       cancelled: Number(row.cancelled),
       revenue: Number(row.revenue),
       completedRevenue: Number(row.completed_revenue),
-      revenueDefinition: 'Active + Completed',
+      revenueDefinition: 'Active + Returned',
     }, { headers: noStore });
   } catch (error) {
     console.error('GET /api/bookings/summary error:', error);
