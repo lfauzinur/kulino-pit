@@ -11,13 +11,16 @@ export default function MemberRegister() {
   const { t } = useI18n();
   const [name, setName] = useState('');
   const [wa, setWa] = useState('');
+  const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
 
   // Google Auth Name Modal
   const [showGoogleNameModal, setShowGoogleNameModal] = useState(false);
   const [googleName, setGoogleName] = useState('');
+  const [googleWa, setGoogleWa] = useState('');
 
   // Read bookBike & redirect from URL search params
   const getMemberRedirect = () => {
@@ -31,16 +34,27 @@ export default function MemberRegister() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setError('');
+    if (!name.trim() || wa.replace(/\D/g, '').length < 9) {
+      setError('Nama lengkap dan nomor WhatsApp yang valid wajib diisi.');
+      return;
+    }
     setLoading(true);
-    const memberProfile = await syncMemberProfile({
-      name,
-      wa,
-      provider: 'form',
-      registeredAt: new Date().toISOString(),
-    });
-    localStorage.setItem('isMember', 'true');
-    localStorage.setItem('memberProfile', JSON.stringify(memberProfile));
-    router.push(getMemberRedirect());
+    try {
+      const memberProfile = await syncMemberProfile({
+        name: name.trim(),
+        wa,
+        address,
+        provider: 'form',
+        registeredAt: new Date().toISOString(),
+      }, { required: true });
+      localStorage.setItem('isMember', 'true');
+      localStorage.setItem('memberProfile', JSON.stringify(memberProfile));
+      router.push(getMemberRedirect());
+    } catch (requestError) {
+      setError(requestError.message);
+      setLoading(false);
+    }
   };
 
   const handleGoogleAuth = () => {
@@ -49,19 +63,29 @@ export default function MemberRegister() {
   };
 
   const handleConfirmGoogleName = async () => {
-    if (!googleName.trim()) return;
-    setShowGoogleNameModal(false);
+    if (!googleName.trim() || googleWa.replace(/\D/g, '').length < 9) {
+      setError('Nama lengkap dan nomor WhatsApp yang valid wajib diisi.');
+      return;
+    }
     setLoading(true);
-    const googleUser = await syncMemberProfile({
-      name: googleName.trim(),
-      email: `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-      photo: null,
-      provider: 'google',
-      registeredAt: new Date().toISOString(),
-    });
-    localStorage.setItem('isMember', 'true');
-    localStorage.setItem('memberProfile', JSON.stringify(googleUser));
-    router.push(getMemberRedirect());
+    setError('');
+    try {
+      const googleUser = await syncMemberProfile({
+        name: googleName.trim(),
+        wa: googleWa,
+        email: `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
+        photo: null,
+        provider: 'google',
+        registeredAt: new Date().toISOString(),
+      }, { required: true });
+      setShowGoogleNameModal(false);
+      localStorage.setItem('isMember', 'true');
+      localStorage.setItem('memberProfile', JSON.stringify(googleUser));
+      router.push(getMemberRedirect());
+    } catch (requestError) {
+      setError(requestError.message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -94,6 +118,7 @@ export default function MemberRegister() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-[var(--shadow-soft)] sm:rounded-3xl sm:px-10 border border-gray-100">
           <form className="space-y-6" onSubmit={handleRegister}>
+            {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 {t('auth.fullName')}
@@ -109,6 +134,11 @@ export default function MemberRegister() {
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Alamat <span className="text-gray-400">(opsional)</span></label>
+              <textarea className="clean-input mt-1 min-h-20" placeholder="Alamat domisili atau pengantaran" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
 
             <div>
@@ -199,7 +229,7 @@ export default function MemberRegister() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm border border-gray-100 shadow-xl relative">
             <button
-              onClick={() => { setShowGoogleNameModal(false); setGoogleName(''); }}
+              onClick={() => { setShowGoogleNameModal(false); setGoogleName(''); setGoogleWa(''); setError(''); }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
             >
               <X size={20} />
@@ -219,7 +249,7 @@ export default function MemberRegister() {
               </div>
               <h3 className="font-display font-black text-xl text-gray-900 mb-1">Daftar dengan Google</h3>
               <p className="text-sm text-gray-500">
-                Hei Goweser baru! Siapa nama kamu? Kami akan tampilkan di profil member 🚴
+                Lengkapi nama dan nomor WhatsApp agar akun serta booking kamu dapat dihubungi.
               </p>
             </div>
 
@@ -236,9 +266,23 @@ export default function MemberRegister() {
               />
             </div>
 
+            <div className="relative mb-4">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="tel"
+                placeholder="Nomor WhatsApp aktif"
+                value={googleWa}
+                onChange={(e) => setGoogleWa(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleConfirmGoogleName()}
+                className="clean-input pl-10 w-full"
+              />
+            </div>
+
+            {error && <p className="mb-4 text-sm font-semibold text-red-600">{error}</p>}
+
             <button
               onClick={handleConfirmGoogleName}
-              disabled={!googleName.trim()}
+              disabled={!googleName.trim() || googleWa.replace(/\D/g, '').length < 9 || loading}
               className="btn btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Daftar Sekarang 🚴

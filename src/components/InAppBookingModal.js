@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { 
   X, Clock, Calendar, Store, Truck, CheckCircle2, CreditCard, 
   Sparkles, ShieldCheck, Copy, ArrowRight, Check, HardHat, Lightbulb, 
-  Briefcase, Map, Shirt, Wrench, QrCode, Banknote
+  Briefcase, Map, Shirt, Wrench, QrCode, Banknote, Phone, MapPin
 } from 'lucide-react';
 import { rentalDurations, accessories, formatCurrency, getPriceByDuration } from '@/lib/data';
 
@@ -32,6 +32,8 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [uniqueCode] = useState(10);
+  const [customerPhone, setCustomerPhone] = useState(member?.wa || member?.phone || '');
+  const [deliveryAddress, setDeliveryAddress] = useState(member?.address || '');
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +75,14 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
   const grandTotal = subtotal + uniqueCode;
 
   const handleConfirmBooking = async () => {
+    if (customerPhone.replace(/\D/g, '').length < 9) {
+      setSubmitError('Nomor WhatsApp aktif wajib diisi sebelum booking.');
+      return;
+    }
+    if (pickupMethod === 'delivery' && !deliveryAddress.trim()) {
+      setSubmitError('Alamat pengantaran wajib diisi.');
+      return;
+    }
     let durationMinutes = 120;
     if (rentalType === 'day') {
       durationMinutes = 24 * 60;
@@ -88,7 +98,7 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName: member?.name || 'Member Kulino Pit',
-          customerPhone: member?.wa || member?.phone || '',
+          customerPhone,
           customerEmail: member?.email || '',
           bikeId: bike.id,
           bikeName: bike.name,
@@ -98,6 +108,7 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
           durationLabel,
           durationMinutes,
           pickupMethod,
+          deliveryAddress,
           accessories: selectedAccessories,
           paymentMethodId,
           uniqueCode,
@@ -381,11 +392,23 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
                 </div>
               </div>
 
-              {/* STEP 3: AKSESORIS TAMBAHAN (OPSIONAL) */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2.5">3. DATA KONTAK</label>
+                <div className="relative">
+                  <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Nomor WhatsApp aktif" className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-3 text-xs font-semibold text-gray-800 focus:border-[var(--color-primary)] focus:bg-white focus:outline-none" />
+                </div>
+                {pickupMethod === 'delivery' && <div className="relative mt-3">
+                  <MapPin size={16} className="absolute left-3 top-3.5 text-gray-400" />
+                  <textarea value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Alamat lengkap pengantaran" className="min-h-20 w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-3 text-xs font-semibold text-gray-800 focus:border-[var(--color-primary)] focus:bg-white focus:outline-none" />
+                </div>}
+              </div>
+
+              {/* STEP 4: AKSESORIS TAMBAHAN (OPSIONAL) */}
               <div>
                 <div className="flex justify-between items-center mb-2.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    3. AKSESORIS TAMBAHAN (OPSIONAL)
+                    4. AKSESORIS TAMBAHAN (OPSIONAL)
                   </label>
                   <span className="text-[9px] text-gray-400">Pilih jika butuh</span>
                 </div>
@@ -426,10 +449,10 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
                 </div>
               </div>
 
-              {/* STEP 4: METODE PEMBAYARAN — bersumber dari Dashboard Admin */}
+              {/* STEP 5: METODE PEMBAYARAN — bersumber dari Dashboard Admin */}
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
-                  4. METODE PEMBAYARAN
+                  5. METODE PEMBAYARAN
                 </label>
                 {paymentLoading ? <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-center text-xs text-gray-500">Memuat metode pembayaran…</div> : paymentMethods.length ? <div className="grid grid-cols-2 gap-3">
                   {paymentMethods.map((method) => (
@@ -464,7 +487,7 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
                 {submitError && <p className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">{submitError}</p>}
                 <button
                   onClick={handleConfirmBooking}
-                  disabled={submitting || !selectedDate || !selectedPaymentMethod}
+                  disabled={submitting || !selectedDate || !selectedPaymentMethod || customerPhone.replace(/\D/g, '').length < 9 || (pickupMethod === 'delivery' && !deliveryAddress.trim())}
                   className="btn btn-primary w-full py-3.5 text-sm font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <CreditCard size={16} /> {submitting ? 'Menyimpan…' : 'Konfirmasi & Sewa Sekarang'}

@@ -12,6 +12,7 @@ export default function UnifiedLogin() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
   const router = useRouter();
 
   // Forgot Password State
@@ -23,6 +24,7 @@ export default function UnifiedLogin() {
   // Google Auth Name Modal
   const [showGoogleNameModal, setShowGoogleNameModal] = useState(false);
   const [googleName, setGoogleName] = useState('');
+  const [googleWa, setGoogleWa] = useState('');
 
   // Read bookBike & redirect from URL search params
   const getRedirectUrl = (role) => {
@@ -59,9 +61,14 @@ export default function UnifiedLogin() {
     // Cek apakah sudah ada profil tersimpan
     const existingProfile = localStorage.getItem('memberProfile');
     if (existingProfile) {
-      // Sudah pernah login — langsung masuk
+      const storedProfile = JSON.parse(existingProfile);
+      if (!(storedProfile.wa || storedProfile.phone)) {
+        setGoogleName(storedProfile.name || '');
+        setShowGoogleNameModal(true);
+        return;
+      }
       setLoading(true);
-      const profile = await syncMemberProfile(JSON.parse(existingProfile));
+      const profile = await syncMemberProfile(storedProfile);
       localStorage.setItem('memberProfile', JSON.stringify(profile));
       localStorage.setItem('isMember', 'true');
       router.push(getRedirectUrl('default'));
@@ -72,19 +79,31 @@ export default function UnifiedLogin() {
   };
 
   const handleConfirmGoogleName = async () => {
-    if (!googleName.trim()) return;
-    setShowGoogleNameModal(false);
+    if (!googleName.trim() || googleWa.replace(/\D/g, '').length < 9) {
+      setAuthError('Nama lengkap dan nomor WhatsApp yang valid wajib diisi.');
+      return;
+    }
     setLoading(true);
-    const googleUser = await syncMemberProfile({
-      name: googleName.trim(),
-      email: `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
-      photo: null,
-      provider: 'google',
-      loginAt: new Date().toISOString(),
-    });
-    localStorage.setItem('memberProfile', JSON.stringify(googleUser));
-    localStorage.setItem('isMember', 'true');
-    router.push(getRedirectUrl('default'));
+    setAuthError('');
+    try {
+      const existing = JSON.parse(localStorage.getItem('memberProfile') || '{}');
+      const googleUser = await syncMemberProfile({
+        ...existing,
+        name: googleName.trim(),
+        wa: googleWa,
+        email: existing.email || `${googleName.trim().toLowerCase().replace(/\s+/g, '.')}@gmail.com`,
+        photo: existing.photo || null,
+        provider: 'google',
+        loginAt: new Date().toISOString(),
+      }, { required: true });
+      setShowGoogleNameModal(false);
+      localStorage.setItem('memberProfile', JSON.stringify(googleUser));
+      localStorage.setItem('isMember', 'true');
+      router.push(getRedirectUrl('default'));
+    } catch (requestError) {
+      setAuthError(requestError.message);
+      setLoading(false);
+    }
   };
 
   const handleResetPassword = (e) => {
@@ -220,7 +239,7 @@ export default function UnifiedLogin() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-sm border border-gray-100 shadow-xl relative">
             <button 
-              onClick={() => { setShowGoogleNameModal(false); setGoogleName(''); }}
+              onClick={() => { setShowGoogleNameModal(false); setGoogleName(''); setGoogleWa(''); setAuthError(''); }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
             >
               <X size={20} />
@@ -240,7 +259,7 @@ export default function UnifiedLogin() {
               </div>
               <h3 className="font-display font-black text-xl text-gray-900 mb-1">Masuk dengan Google</h3>
               <p className="text-sm text-gray-500">
-                Hei Goweser! Siapa nama kamu? Kami akan tampilkan ini di profil member kamu 🚴
+                Lengkapi nama dan nomor WhatsApp agar akun serta booking kamu dapat dihubungi.
               </p>
             </div>
 
@@ -257,9 +276,23 @@ export default function UnifiedLogin() {
               />
             </div>
 
+            <div className="relative mb-4">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="tel"
+                placeholder="Nomor WhatsApp aktif"
+                value={googleWa}
+                onChange={(e) => setGoogleWa(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleConfirmGoogleName()}
+                className="clean-input pl-10 w-full"
+              />
+            </div>
+
+            {authError && <p className="mb-4 text-sm font-semibold text-red-600">{authError}</p>}
+
             <button
               onClick={handleConfirmGoogleName}
-              disabled={!googleName.trim()}
+              disabled={!googleName.trim() || googleWa.replace(/\D/g, '').length < 9 || loading}
               className="btn btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Lanjut Masuk 🚴

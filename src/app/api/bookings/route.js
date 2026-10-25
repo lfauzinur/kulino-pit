@@ -7,6 +7,15 @@ export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
 const accessoryPrices = { helmet: 25000, lights: 35000, saddlebag: 20000, gps: 75000, jersey: 95000, repairkit: 30000 };
 
+function normalizePhone(value) {
+  return String(value || '').trim().replace(/[^\d+]/g, '').slice(0, 40);
+}
+
+function isValidPhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 9 && digits.length <= 15;
+}
+
 export async function GET() {
   if (!(await requireAdminSession())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: noStore });
@@ -24,19 +33,20 @@ export async function GET() {
 
 export async function POST(request) {
   try {
-    await ensureAppDatabase();
     const body = await request.json();
     const customerName = String(body.customerName || '').trim();
+    const customerPhone = normalizePhone(body.customerPhone);
     const rentalDate = String(body.rentalDate || '').slice(0, 10);
     const durationMinutes = Number(body.durationMinutes || 1440);
     const bikeId = Number(body.bikeId);
 
-    if (!customerName || !Number.isSafeInteger(bikeId) || !/^\d{4}-\d{2}-\d{2}$/.test(rentalDate)) {
-      return NextResponse.json({ error: 'Nama, sepeda, dan tanggal wajib diisi.' }, { status: 400 });
+    if (!customerName || !isValidPhone(customerPhone) || !Number.isSafeInteger(bikeId) || !/^\d{4}-\d{2}-\d{2}$/.test(rentalDate)) {
+      return NextResponse.json({ error: 'Nama, nomor WhatsApp valid, sepeda, dan tanggal wajib diisi.' }, { status: 400 });
     }
     if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
       return NextResponse.json({ error: 'Nilai booking tidak valid.' }, { status: 400 });
     }
+    await ensureAppDatabase();
 
     const bikes = await sql`
       SELECT b.id, b.name, b.available, b.stock_count, b.price_per_day, b.price_2h, b.price_3h, b.price_4h, b.price_6h,
@@ -82,7 +92,7 @@ export async function POST(request) {
         duration_minutes, pickup_method, delivery_address, accessories, payment_method, payment_method_id,
         total_amount, status, active_since
       ) VALUES (
-        ${code}, ${customerName}, ${String(body.customerPhone || '').trim()},
+        ${code}, ${customerName}, ${customerPhone},
         ${String(body.customerEmail || '').trim()}, ${String(body.customerIdNumber || '').trim()},
         ${bikeId}, ${bike.name}, ${rentalDate},
         ${String(body.startTime || '')}, ${durationKey},

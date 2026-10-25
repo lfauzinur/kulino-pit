@@ -172,7 +172,9 @@ export default function AdminBookingsPage() {
                   </td>
                   <td className="p-4">
                     <p className="text-sm font-bold text-gray-900">{b.user}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">{b.phone}</p>
+                    {b.phone
+                      ? <p className="text-[10px] font-semibold text-green-600 mt-0.5">WA {b.phone}</p>
+                      : <p className="text-[10px] font-bold text-red-600 mt-0.5">No. WA belum tersedia</p>}
                   </td>
                   <td className="p-4">
                     <p className="text-xs font-semibold text-gray-700">{b.bike}</p>
@@ -232,6 +234,7 @@ export default function AdminBookingsPage() {
                 ['Waktu', selectedBooking.time || '-'],
                 ['Durasi', selectedBooking.duration || `${selectedBooking.days} hari`],
                 ['Metode Ambil', selectedBooking.pickupMethod === 'delivery' ? 'Delivery' : 'Pickup'],
+                ['Alamat', selectedBooking.deliveryAddress || '-'],
                 ['Pembayaran', selectedBooking.paymentMethod || '-'],
                 ['Total', formatCurrency(selectedBooking.total)],
               ].map(([label, value]) => (

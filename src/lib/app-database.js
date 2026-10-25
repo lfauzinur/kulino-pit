@@ -74,6 +74,7 @@ export function ensureAppDatabase() {
           name TEXT NOT NULL,
           phone TEXT DEFAULT '',
           email TEXT DEFAULT '',
+          address TEXT DEFAULT '',
           provider TEXT NOT NULL DEFAULT 'form',
           photo_url TEXT DEFAULT '',
           created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -81,6 +82,8 @@ export function ensureAppDatabase() {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
       `;
+
+      await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS address TEXT DEFAULT ''`;
 
       await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method_id TEXT DEFAULT ''`;
 
@@ -358,6 +361,7 @@ export function bookingRow(row) {
     durationMinutes: row.duration_minutes,
     days: Math.max(1, Math.ceil((row.duration_minutes || 1440) / 1440)),
     pickupMethod: row.pickup_method,
+    deliveryAddress: row.delivery_address || '',
     paymentMethod: row.payment_method,
     paymentMethodId: row.payment_method_id || '',
     total: row.total_amount,

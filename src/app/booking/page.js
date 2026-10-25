@@ -440,11 +440,15 @@ export default function BookingPage() {
       if (rentalType === 'day') return dates.start && dates.end;
       return !!dates.start;
     }
-    if (step === 3) return Boolean(customerInfo.fullName?.trim() && customerInfo.phone?.trim() && customerInfo.email?.trim());
+    if (step === 3) return Boolean(customerInfo.fullName?.trim() && customerInfo.phone?.replace(/\D/g, '').length >= 9 && customerInfo.email?.trim());
     return true;
   };
 
   const handleSubmit = async () => {
+    if (!customerInfo.fullName?.trim() || customerInfo.phone?.replace(/\D/g, '').length < 9) {
+      setSubmitError('Nama lengkap dan nomor WhatsApp yang valid wajib diisi.');
+      return;
+    }
     let quantity = 1;
     if (rentalType === 'day' && dates.start && dates.end) {
       quantity = Math.max(1, Math.ceil((new Date(dates.end) - new Date(dates.start)) / (1000 * 60 * 60 * 24)));

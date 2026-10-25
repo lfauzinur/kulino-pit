@@ -1,5 +1,5 @@
 // Kulino Pit Service Worker - Progressive Web App
-const CACHE_NAME = 'kulino-pit-v5';
+const CACHE_NAME = 'kulino-pit-v6';
 const PRECACHE_ASSETS = [
   '/',
   '/member',
@@ -24,9 +24,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
+          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
         })
       );
     }).then(() => self.clients.claim())
@@ -37,14 +35,10 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (!event.request.url.startsWith(self.location.origin)) return;
   const requestUrl = new URL(event.request.url);
-
-  // Admin and API data must never be served from an old application cache.
   if (requestUrl.pathname.startsWith('/admin') || requestUrl.pathname.startsWith('/api/')) return;
 
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match('/') || caches.match('/member'))
-    );
+    event.respondWith(fetch(event.request).catch(() => caches.match('/') || caches.match('/member')));
     return;
   }
 
@@ -53,9 +47,7 @@ self.addEventListener('fetch', (event) => {
       if (cachedResponse) {
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse.clone());
-            });
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse.clone()));
           }
         }).catch(() => {});
         return cachedResponse;
@@ -63,23 +55,16 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request).then((networkResponse) => {
         if (
-          networkResponse &&
-          networkResponse.status === 200 &&
-          (event.request.url.includes('/_next/static/') ||
-           event.request.url.includes('/images/') ||
-           event.request.url.endsWith('.png') ||
-           event.request.url.endsWith('.svg'))
+          networkResponse && networkResponse.status === 200 &&
+          (event.request.url.includes('/_next/static/') || event.request.url.includes('/images/') ||
+           event.request.url.endsWith('.png') || event.request.url.endsWith('.svg'))
         ) {
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         }
         return networkResponse;
       }).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('/member') || caches.match('/');
-        }
+        if (event.request.mode === 'navigate') return caches.match('/member') || caches.match('/');
       });
     })
   );
