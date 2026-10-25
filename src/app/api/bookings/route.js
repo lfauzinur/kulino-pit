@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { bookingRow, ensureAppDatabase, sql } from '@/lib/app-database';
 import { readPaymentMethods } from '@/lib/payment-methods';
+import { getMemberSession } from '@/lib/member-auth';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -47,6 +48,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Nilai booking tidak valid.' }, { status: 400 });
     }
     await ensureAppDatabase();
+    const memberSession = await getMemberSession();
 
     const bikes = await sql`
       SELECT b.id, b.name, b.available, b.stock_count, b.price_per_day, b.price_2h, b.price_3h, b.price_4h, b.price_6h,
@@ -87,12 +89,12 @@ export async function POST(request) {
     const code = `KP-${Date.now().toString().slice(-9)}`;
     const rows = await sql`
       INSERT INTO bookings (
-        booking_code, customer_name, customer_phone, customer_email, customer_id_number,
+        booking_code, member_id, customer_name, customer_phone, customer_email, customer_id_number,
         bike_id, bike_name, rental_date, start_time, duration_key, duration_label,
         duration_minutes, pickup_method, delivery_address, accessories, payment_method, payment_method_id,
         total_amount, status, active_since
       ) VALUES (
-        ${code}, ${customerName}, ${customerPhone},
+        ${code}, ${memberSession?.memberId || null}, ${customerName}, ${customerPhone},
         ${String(body.customerEmail || '').trim()}, ${String(body.customerIdNumber || '').trim()},
         ${bikeId}, ${bike.name}, ${rentalDate},
         ${String(body.startTime || '')}, ${durationKey},

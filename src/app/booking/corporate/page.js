@@ -3,44 +3,30 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Award, Building2, Phone, Calendar, Camera, CheckCircle, ChevronLeft, Leaf, Star, Users, Bike } from 'lucide-react';
 
-const packages = [
-  {
-    id: 'corp-small',
-    name: 'Corporate S',
-    persons: '5–15 orang',
-    bikes: '5–15 sepeda pilihan',
-    duration: '½ hari (4 jam)',
-    price: 'Mulai Rp 500.000',
-    features: ['Helm untuk semua peserta', 'Briefing keselamatan', 'Rute tim yang terstruktur', 'Koordinator lapangan', 'Cocok untuk team building ringan'],
-    popular: false,
-  },
-  {
-    id: 'corp-medium',
-    name: 'Corporate M',
-    persons: '15–30 orang',
-    bikes: '15–30 sepeda',
-    duration: 'Sehari penuh (8 jam)',
-    price: 'Mulai Rp 1.500.000',
-    features: ['Semua fasilitas S', 'Tim Road Captain & Marshal', 'Pengiriman ke venue/hotel', 'Snack & minum', 'Dokumentasi foto & video', 'Jersey corporate (opsional)'],
-    popular: true,
-  },
-  {
-    id: 'corp-large',
-    name: 'Corporate L / Event',
-    persons: '30–100+ orang',
-    bikes: '30–100+ sepeda',
-    duration: 'Disesuaikan',
-    price: 'Custom Quotation',
-    features: ['Semua fasilitas M', 'Tim mekanik & medis standby', 'Sound system & MC', 'Merchandise & goodie bag', 'Coverage media sosial', 'Sertifikat peserta'],
-    popular: false,
-  },
-];
-
 const benefitIcons = { users: Users, camera: Camera, award: Award, leaf: Leaf };
+
+function whatsappUrl(pkg, fallbackMessage) {
+  const number = String(pkg?.whatsappNumber || '').replace(/\D/g, '');
+  return `https://wa.me/${number}?text=${encodeURIComponent(pkg?.whatsappMessage || fallbackMessage)}`;
+}
 
 export default function CorporateBookingPage() {
   const [benefits, setBenefits] = useState([]);
-  useEffect(() => { fetch('/api/content-cards?section=corporate_benefits', { cache: 'no-store' }).then((response) => response.ok ? response.json() : []).then(setBenefits).catch(() => setBenefits([])); }, []);
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/content-cards?section=corporate_benefits', { cache: 'no-store' }).then((response) => response.ok ? response.json() : []),
+      fetch('/api/rental-packages?type=corporate', { cache: 'no-store' }).then((response) => response.ok ? response.json() : []),
+    ]).then(([nextBenefits, nextPackages]) => {
+      setBenefits(nextBenefits);
+      setPackages(nextPackages);
+    }).catch(() => {
+      setBenefits([]);
+      setPackages([]);
+    }).finally(() => setLoading(false));
+  }, []);
+  const contactPackage = packages.find((item) => item.popular) || packages[0];
   return (
     <div className="pt-24 pb-20 min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -75,6 +61,8 @@ export default function CorporateBookingPage() {
 
         {/* Packages */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {loading && <div className="md:col-span-3 rounded-3xl border bg-white p-10 text-center text-sm text-gray-500">Memuat paket…</div>}
+          {!loading && packages.length === 0 && <div className="md:col-span-3 rounded-3xl border border-dashed bg-white p-10 text-center text-sm text-gray-500">Belum ada paket Corporate yang ditayangkan.</div>}
           {packages.map(pkg => (
             <div key={pkg.id} className={`bg-white rounded-3xl p-6 shadow-sm border flex flex-col relative ${pkg.popular ? 'border-[var(--color-primary)] shadow-md' : 'border-gray-100'}`}>
               {pkg.popular && (
@@ -98,12 +86,12 @@ export default function CorporateBookingPage() {
               </ul>
 
               <a
-                href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Halo Kulino Pit! Kami tertarik dengan paket Corporate Rent: ${pkg.name} untuk perusahaan kami. Bisa minta penawaran harga?`)}`}
+                href={whatsappUrl(pkg, `Halo Kulino Pit! Kami tertarik dengan paket Corporate Rent: ${pkg.name} untuk perusahaan kami. Bisa minta penawaran harga?`)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`btn w-full py-3 text-center flex items-center justify-center gap-2 ${pkg.popular ? 'btn-primary' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
               >
-                <Phone size={15} /> Minta Penawaran
+                <Phone size={15} /> {pkg.whatsappLabel || 'Minta Penawaran'}
               </a>
             </div>
           ))}
@@ -134,7 +122,7 @@ export default function CorporateBookingPage() {
           <h2 className="font-display font-black text-2xl mb-2">Siap Rencanakan Event Anda?</h2>
           <p className="text-blue-100 mb-6 text-sm">Hubungi kami sekarang dan dapatkan penawaran terbaik untuk tim Anda.</p>
           <a
-            href="https://wa.me/6281234567890?text=Halo%20Kulino%20Pit!%20Kami%20ingin%20konsultasi%20paket%20Corporate%20Rent%20untuk%20perusahaan%20kami."
+            href={whatsappUrl(contactPackage, 'Halo Kulino Pit! Kami ingin konsultasi paket Corporate Rent untuk perusahaan kami.')}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-white text-[var(--color-primary)] font-bold px-8 py-3 rounded-2xl hover:bg-blue-50 transition-colors"

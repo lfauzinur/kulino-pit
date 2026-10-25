@@ -1,9 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { 
-  ArrowLeft, Navigation2, Plus, Trash2, Edit3, Save, X, MapPin, 
-  Clock, Mountain, ChevronRight, ToggleLeft, ToggleRight, Bike
+  Navigation2, Plus, Trash2, Edit3, Save, X, MapPin,
+  ToggleLeft, ToggleRight
 } from 'lucide-react';
 import AdminConfirmPage from '@/components/AdminConfirmPage';
 
@@ -16,36 +15,46 @@ export default function AdminRoutesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [deletingRoute, setDeletingRoute] = useState(null);
   const [formError, setFormError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
 
-  // Load routes from localStorage
+  // One database source is shared by Admin, Member, and the public routes page.
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const stored = localStorage.getItem('kulinoPitRoutes');
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) setRoutes(parsed);
-        } catch (e) { /* ignore */ }
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    fetch('/api/routes?admin=1', { cache: 'no-store' })
+      .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Rute gagal dimuat.'); return data; })
+      .then((data) => { if (!cancelled) setRoutes(Array.isArray(data.items) ? data.items : []); })
+      .catch((error) => { if (!cancelled) setMessage(error.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  // Save routes to localStorage
-  const saveRoutes = (newRoutes) => {
-    setRoutes(newRoutes);
-    localStorage.setItem('kulinoPitRoutes', JSON.stringify(newRoutes));
+  const saveRoutes = async (newRoutes) => {
+    setSaving(true);
+    try {
+      const response = await fetch('/api/routes', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ routes: newRoutes }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Rute gagal disimpan.');
+      setRoutes(Array.isArray(data.items) ? data.items : newRoutes);
+      setMessage('Rute tersimpan dan sudah sinkron ke website serta Dashboard Member.');
+      return true;
+    } catch (error) {
+      setMessage(error.message);
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const deleteRoute = (route) => {
+  const deleteRoute = async (route) => {
     if (route) { setDeletingRoute(route); return; }
     if (!deletingRoute) return;
-    saveRoutes(routes.filter(r => r.id !== deletingRoute.id));
-    setDeletingRoute(null);
+    if (await saveRoutes(routes.filter(r => r.id !== deletingRoute.id))) setDeletingRoute(null);
   };
 
-  const toggleActive = (id) => {
-    saveRoutes(routes.map(r => r.id === id ? { ...r, active: !r.active } : r));
+  const toggleActive = async (id) => {
+    await saveRoutes(routes.map(r => r.id === id ? { ...r, active: !r.active } : r));
   };
 
   const emptyRoute = () => ({
@@ -78,7 +87,7 @@ export default function AdminRoutesPage() {
     setIsCreating(false);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingRoute.name.trim()) {
       setFormError('Nama rute wajib diisi.');
       return;
@@ -99,13 +108,11 @@ export default function AdminRoutesPage() {
         })),
     };
 
-    if (isCreating) {
-      saveRoutes([...routes, cleaned]);
-    } else {
-      saveRoutes(routes.map(r => r.id === cleaned.id ? cleaned : r));
+    const nextRoutes = isCreating ? [...routes, cleaned] : routes.map(r => r.id === cleaned.id ? cleaned : r);
+    if (await saveRoutes(nextRoutes)) {
+      setEditingRoute(null);
+      setIsCreating(false);
     }
-    setEditingRoute(null);
-    setIsCreating(false);
   };
 
   const addCheckpoint = () => {
@@ -316,8 +323,8 @@ export default function AdminRoutesPage() {
             <button onClick={cancelEdit} className="flex-1 py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-sm transition-colors cursor-pointer">
               Batal
             </button>
-            <button onClick={saveEdit} className="flex-1 py-3 rounded-2xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-md">
-              <Save size={16} /> {isCreating ? 'Simpan Rute Baru' : 'Simpan Perubahan'}
+            <button onClick={saveEdit} disabled={saving} className="flex-1 py-3 rounded-2xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-light)] text-white font-bold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-md disabled:opacity-60">
+              <Save size={16} /> {saving ? 'Menyimpan…' : isCreating ? 'Simpan Rute Baru' : 'Simpan Perubahan'}
             </button>
           </div>
         </div>
@@ -343,7 +350,9 @@ export default function AdminRoutesPage() {
         </button>
       </div>
 
-      {routes.length === 0 ? (
+      {message && <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold text-blue-700">{message}</div>}
+
+      {loading ? <div className="rounded-2xl border bg-white p-12 text-center text-sm text-gray-500">Memuat rute…</div> : routes.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
           <Navigation2 size={48} className="mx-auto text-gray-200 mb-4" />
           <h3 className="font-display font-bold text-lg text-gray-900 mb-2">Belum Ada Rute</h3>

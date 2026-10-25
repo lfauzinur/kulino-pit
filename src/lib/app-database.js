@@ -88,6 +88,7 @@ export function ensureAppDatabase() {
 
       await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method_id TEXT DEFAULT ''`;
       await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS returned_at TIMESTAMPTZ`;
+      await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS member_id BIGINT`;
 
       await sql`ALTER TABLE partner_applications ADD COLUMN IF NOT EXISTS photo_public_id TEXT`;
 
@@ -271,6 +272,28 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`
+        CREATE TABLE IF NOT EXISTS rental_packages (
+          id BIGSERIAL PRIMARY KEY,
+          package_type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          persons TEXT NOT NULL DEFAULT '',
+          bikes TEXT NOT NULL DEFAULT '',
+          duration TEXT NOT NULL DEFAULT '',
+          price_label TEXT NOT NULL DEFAULT '',
+          features JSONB NOT NULL DEFAULT '[]'::jsonb,
+          popular BOOLEAN NOT NULL DEFAULT false,
+          whatsapp_number TEXT NOT NULL DEFAULT '628113000000',
+          whatsapp_label TEXT NOT NULL DEFAULT 'Pesan via WhatsApp',
+          whatsapp_message TEXT NOT NULL DEFAULT '',
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          published BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          CONSTRAINT rental_packages_type_check CHECK (package_type IN ('family', 'corporate'))
+        )
+      `;
+
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_categories_name_lower_idx ON tour_categories (LOWER(name))`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_name_lower_idx ON tour_packages (LOWER(name))`;
       await sql`INSERT INTO tour_categories (name) VALUES ('Group Tours'), ('Private Tours') ON CONFLICT DO NOTHING`;
@@ -358,8 +381,25 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`
+        INSERT INTO rental_packages (package_type, name, persons, bikes, duration, price_label, features, popular, whatsapp_number, whatsapp_label, whatsapp_message, sort_order)
+        SELECT seed.* FROM (VALUES
+          ('family', 'Family Basic', '2–4 orang', '2–4 sepeda city/folding', '½ hari (4 jam)', 'Mulai Rp 180.000', '["Helm untuk semua peserta","Panduan rute rekomendasi","Lokasi pengambilan: Kulino House","Cocok untuk area kota"]'::jsonb, false, '628113000000', 'Pesan via WhatsApp', 'Halo Kulino Pit! Saya tertarik dengan paket Family Basic. Bisa info lebih lanjut?', 10),
+          ('family', 'Family Plus', '2–6 orang', '2–6 sepeda pilihan', 'Sehari penuh (8 jam)', 'Mulai Rp 350.000', '["Helm & lampu untuk semua","Road Captain pendamping","Snack & air mineral","Dokumentasi foto keluarga","Rute wisata Banyuwangi"]'::jsonb, true, '628113000000', 'Pesan via WhatsApp', 'Halo Kulino Pit! Saya tertarik dengan paket Family Plus. Bisa info lebih lanjut?', 20),
+          ('family', 'Family Premium', '4–10 orang', '4–10 sepeda premium', '2 hari', 'Mulai Rp 800.000', '["Semua fasilitas Family Plus","Pengiriman ke lokasi hotel","Tim mekanik standby","Asuransi perjalanan","Jersey keluarga eksklusif"]'::jsonb, false, '628113000000', 'Pesan via WhatsApp', 'Halo Kulino Pit! Saya tertarik dengan paket Family Premium. Bisa info lebih lanjut?', 30),
+          ('corporate', 'Corporate S', '5–15 orang', '5–15 sepeda pilihan', '½ hari (4 jam)', 'Mulai Rp 500.000', '["Helm untuk semua peserta","Briefing keselamatan","Rute tim yang terstruktur","Koordinator lapangan","Cocok untuk team building ringan"]'::jsonb, false, '628113000000', 'Minta Penawaran', 'Halo Kulino Pit! Kami tertarik dengan paket Corporate S. Bisa minta penawaran harga?', 10),
+          ('corporate', 'Corporate M', '15–30 orang', '15–30 sepeda', 'Sehari penuh (8 jam)', 'Mulai Rp 1.500.000', '["Semua fasilitas S","Tim Road Captain & Marshal","Pengiriman ke venue/hotel","Snack & minum","Dokumentasi foto & video","Jersey corporate (opsional)"]'::jsonb, true, '628113000000', 'Minta Penawaran', 'Halo Kulino Pit! Kami tertarik dengan paket Corporate M. Bisa minta penawaran harga?', 20),
+          ('corporate', 'Corporate L / Event', '30–100+ orang', '30–100+ sepeda', 'Disesuaikan', 'Custom Quotation', '["Semua fasilitas M","Tim mekanik & medis standby","Sound system & MC","Merchandise & goodie bag","Coverage media sosial","Sertifikat peserta"]'::jsonb, false, '628113000000', 'Minta Penawaran', 'Halo Kulino Pit! Kami tertarik dengan paket Corporate L / Event. Bisa minta penawaran harga?', 30)
+        ) AS seed(package_type, name, persons, bikes, duration, price_label, features, popular, whatsapp_number, whatsapp_label, whatsapp_message, sort_order)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM rental_packages
+          WHERE rental_packages.package_type = seed.package_type AND LOWER(rental_packages.name) = LOWER(seed.name)
+        )
+      `;
+
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)`;
+      await sql`CREATE INDEX IF NOT EXISTS bookings_member_id_idx ON bookings (member_id, created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS partner_status_idx ON partner_applications (status)`;
       await sql`CREATE INDEX IF NOT EXISTS members_created_at_idx ON members (created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS articles_status_idx ON articles (status, published_at DESC)`;
@@ -373,6 +413,8 @@ export function ensureAppDatabase() {
       await sql`CREATE INDEX IF NOT EXISTS gallery_items_sort_idx ON gallery_items (published, sort_order, id)`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS content_cards_section_title_idx ON content_cards (section_key, LOWER(title_id))`;
       await sql`CREATE INDEX IF NOT EXISTS content_cards_sort_idx ON content_cards (section_key, published, sort_order, id)`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS rental_packages_type_name_idx ON rental_packages (package_type, LOWER(name))`;
+      await sql`CREATE INDEX IF NOT EXISTS rental_packages_sort_idx ON rental_packages (package_type, published, sort_order, id)`;
       await sql`CREATE INDEX IF NOT EXISTS footer_items_sort_idx ON footer_items (group_key, published, sort_order, id)`;
     })().catch((error) => {
       schemaPromise = undefined;
@@ -392,6 +434,7 @@ export function bookingRow(row) {
     user: row.customer_name,
     phone: row.customer_phone,
     email: row.customer_email,
+    memberId: row.member_id ? Number(row.member_id) : null,
     bikeId: row.bike_id ? Number(row.bike_id) : null,
     bike: row.bike_name,
     duration: row.duration_label,
@@ -583,6 +626,25 @@ export function contentCardRow(row) {
     icon: row.icon,
     accentColor: row.accent_color,
     sortOrder: Number(row.sort_order),
+    published: Boolean(row.published),
+  };
+}
+
+export function rentalPackageRow(row) {
+  return {
+    id: Number(row.id),
+    type: row.package_type,
+    name: row.name,
+    persons: row.persons || '',
+    bikes: row.bikes || '',
+    duration: row.duration || '',
+    price: row.price_label || '',
+    features: Array.isArray(row.features) ? row.features : [],
+    popular: Boolean(row.popular),
+    whatsappNumber: row.whatsapp_number || '',
+    whatsappLabel: row.whatsapp_label || 'Pesan via WhatsApp',
+    whatsappMessage: row.whatsapp_message || '',
+    sortOrder: Number(row.sort_order || 0),
     published: Boolean(row.published),
   };
 }

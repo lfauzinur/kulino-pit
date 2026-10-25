@@ -117,8 +117,6 @@ export default function InAppBookingModal({ bike, member, initialDraft, onClose,
       const newBooking = await response.json();
       if (!response.ok) throw new Error(newBooking.error || 'Booking gagal disimpan.');
       const memberBooking = { ...newBooking, status: newBooking.status.toLowerCase(), points: 0 };
-      const existing = JSON.parse(localStorage.getItem('memberBookings') || '[]');
-      localStorage.setItem('memberBookings', JSON.stringify([memberBooking, ...existing]));
       setBookingResult({ ...newBooking, uniqueCode, subtotal });
       setIsSubmitted(true);
       sessionStorage.removeItem('kulinoBookingDraft');

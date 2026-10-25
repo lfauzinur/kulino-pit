@@ -39,6 +39,8 @@ export async function GET() {
       const key = pKey || eKey || `member:${member.id}`;
       customers.set(key, {
         id: member.member_code || `member-${member.id}`,
+        memberIds: [Number(member.id)],
+        bookingIds: [],
         name: member.name,
         phone: member.phone || '',
         email: member.email || '',
@@ -60,6 +62,8 @@ export async function GET() {
       if (!customers.has(key)) {
         customers.set(key, {
           id: `customer-${row.id}`,
+          memberIds: [],
+          bookingIds: [],
           name: row.customer_name,
           phone: row.customer_phone || '',
           email: row.customer_email || '',
@@ -71,6 +75,7 @@ export async function GET() {
         });
       }
       const customer = customers.get(key);
+      customer.bookingIds.push(Number(row.id));
       customer.name ||= row.customer_name;
       customer.phone ||= row.customer_phone || '';
       customer.email ||= row.customer_email || '';
@@ -94,5 +99,51 @@ export async function GET() {
   } catch (error) {
     console.error('GET /api/admin/customers error:', error);
     return NextResponse.json({ error: 'Gagal memuat data customer.' }, { status: 500, headers: noStore });
+  }
+}
+
+function numericIds(values) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map(Number)
+    .filter((value) => Number.isSafeInteger(value) && value > 0))];
+}
+
+export async function DELETE(request) {
+  if (!(await requireAdminSession())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: noStore });
+  }
+
+  try {
+    await ensureAppDatabase();
+    const body = await request.json();
+    const targets = Array.isArray(body.targets) ? body.targets : [];
+    const memberIds = numericIds(targets.flatMap((target) => target?.memberIds));
+    const bookingIds = numericIds(targets.flatMap((target) => target?.bookingIds));
+    if (!targets.length || (!memberIds.length && !bookingIds.length)) {
+      return NextResponse.json({ error: 'Pilih minimal satu customer untuk dihapus.' }, { status: 400, headers: noStore });
+    }
+    if (memberIds.length + bookingIds.length > 10000) {
+      return NextResponse.json({ error: 'Jumlah data yang dipilih terlalu banyak.' }, { status: 400, headers: noStore });
+    }
+
+    const rows = await sql`
+      WITH deleted_bookings AS (
+        DELETE FROM bookings WHERE id = ANY(${bookingIds}::bigint[]) RETURNING id
+      ), deleted_members AS (
+        DELETE FROM members WHERE id = ANY(${memberIds}::bigint[]) RETURNING id
+      )
+      SELECT
+        (SELECT COUNT(*) FROM deleted_bookings)::int AS bookings,
+        (SELECT COUNT(*) FROM deleted_members)::int AS members
+    `;
+    return NextResponse.json({
+      success: true,
+      deletedCustomers: targets.length,
+      deletedBookings: Number(rows[0]?.bookings || 0),
+      deletedMembers: Number(rows[0]?.members || 0),
+    }, { headers: noStore });
+  } catch (error) {
+    console.error('DELETE /api/admin/customers error:', error);
+    return NextResponse.json({ error: 'Customer gagal dihapus.' }, { status: 500, headers: noStore });
   }
 }

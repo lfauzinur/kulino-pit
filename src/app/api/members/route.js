@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ensureAppDatabase, sql } from '@/lib/app-database';
+import { createMemberSessionToken, MEMBER_SESSION_COOKIE, MEMBER_SESSION_MAX_AGE } from '@/lib/member-auth';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -54,10 +55,10 @@ export async function POST(request) {
         photo_url = CASE WHEN EXCLUDED.photo_url <> '' THEN EXCLUDED.photo_url ELSE members.photo_url END,
         last_login_at = NOW(),
         updated_at = NOW()
-      RETURNING member_code, name, phone, email, address, provider, photo_url, created_at
+      RETURNING id, member_code, name, phone, email, address, provider, photo_url, created_at
     `;
     const member = rows[0];
-    return NextResponse.json({
+    const response = NextResponse.json({
       memberId: member.member_code,
       name: member.name,
       wa: member.phone,
@@ -67,6 +68,16 @@ export async function POST(request) {
       photo: member.photo_url || null,
       registeredAt: member.created_at,
     }, { status: 201, headers: noStore });
+    response.cookies.set({
+      name: MEMBER_SESSION_COOKIE,
+      value: createMemberSessionToken(member),
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: MEMBER_SESSION_MAX_AGE,
+    });
+    return response;
   } catch (error) {
     console.error('POST /api/members error:', error);
     return NextResponse.json({ error: 'Data member gagal disimpan.' }, { status: 500, headers: noStore });

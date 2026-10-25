@@ -1,41 +1,24 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Users, Phone, Calendar, CheckCircle, ChevronLeft, Star } from 'lucide-react';
 
-const packages = [
-  {
-    id: 'family-basic',
-    name: 'Family Basic',
-    persons: '2–4 orang',
-    bikes: '2–4 sepeda city/folding',
-    duration: '½ hari (4 jam)',
-    price: 'Mulai Rp 180.000',
-    features: ['Helm untuk semua peserta', 'Panduan rute rekomendasi', 'Lokasi pengambilan: Kulino House', 'Cocok untuk area kota'],
-    popular: false,
-  },
-  {
-    id: 'family-plus',
-    name: 'Family Plus',
-    persons: '2–6 orang',
-    bikes: '2–6 sepeda pilihan',
-    duration: 'Sehari penuh (8 jam)',
-    price: 'Mulai Rp 350.000',
-    features: ['Helm & lampu untuk semua', 'Road Captain pendamping', 'Snack & air mineral', 'Dokumentasi foto keluarga', 'Rute wisata Banyuwangi'],
-    popular: true,
-  },
-  {
-    id: 'family-premium',
-    name: 'Family Premium',
-    persons: '4–10 orang',
-    bikes: '4–10 sepeda premium',
-    duration: '2 hari',
-    price: 'Mulai Rp 800.000',
-    features: ['Semua fasilitas Family Plus', 'Pengiriman ke lokasi hotel', 'Tim mekanik standby', 'Asuransi perjalanan', 'Jersey keluarga eksklusif'],
-    popular: false,
-  },
-];
+function whatsappUrl(pkg, fallbackMessage) {
+  const number = String(pkg?.whatsappNumber || '').replace(/\D/g, '');
+  return `https://wa.me/${number}?text=${encodeURIComponent(pkg?.whatsappMessage || fallbackMessage)}`;
+}
 
 export default function FamilyBookingPage() {
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    fetch('/api/rental-packages?type=family', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Paket gagal dimuat.')))
+      .then(setPackages)
+      .catch(() => setPackages([]))
+      .finally(() => setLoading(false));
+  }, []);
+  const contactPackage = packages.find((item) => item.popular) || packages[0];
   return (
     <div className="pt-24 pb-20 min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -59,6 +42,8 @@ export default function FamilyBookingPage() {
 
         {/* Packages */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {loading && <div className="md:col-span-3 rounded-3xl border bg-white p-10 text-center text-sm text-gray-500">Memuat paket…</div>}
+          {!loading && packages.length === 0 && <div className="md:col-span-3 rounded-3xl border border-dashed bg-white p-10 text-center text-sm text-gray-500">Belum ada paket Family yang ditayangkan.</div>}
           {packages.map(pkg => (
             <div key={pkg.id} className={`bg-white rounded-3xl p-6 shadow-sm border flex flex-col relative ${pkg.popular ? 'border-[var(--color-primary)] shadow-md' : 'border-gray-100'}`}>
               {pkg.popular && (
@@ -82,12 +67,12 @@ export default function FamilyBookingPage() {
               </ul>
 
               <a
-                href={`https://wa.me/6281234567890?text=${encodeURIComponent(`Halo Kulino Pit! Saya tertarik dengan paket Family Rent: ${pkg.name}. Bisa info lebih lanjut?`)}`}
+                href={whatsappUrl(pkg, `Halo Kulino Pit! Saya tertarik dengan paket Family Rent: ${pkg.name}. Bisa info lebih lanjut?`)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`btn w-full py-3 text-center flex items-center justify-center gap-2 ${pkg.popular ? 'btn-primary' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
               >
-                <Phone size={15} /> Pesan via WhatsApp
+                <Phone size={15} /> {pkg.whatsappLabel || 'Pesan via WhatsApp'}
               </a>
             </div>
           ))}
@@ -99,7 +84,7 @@ export default function FamilyBookingPage() {
           <h2 className="font-display font-black text-2xl text-gray-900 mb-2">Butuh paket khusus?</h2>
           <p className="text-gray-500 mb-6 text-sm">Kami bisa menyesuaikan paket untuk kebutuhan keluarga Anda yang unik.</p>
           <a
-            href="https://wa.me/6281234567890?text=Halo%20Kulino%20Pit!%20Saya%20ingin%20tanya%20paket%20Family%20Rent%20khusus."
+            href={whatsappUrl(contactPackage, 'Halo Kulino Pit! Saya ingin tanya paket Family Rent khusus.')}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn-primary px-8 py-3 inline-flex items-center gap-2"

@@ -6,11 +6,12 @@ import { formatCurrency, getLowestPrice } from '@/lib/data';
 
 export default function InAppBikeCatalogModal({ isOpen, onClose, onSelectBike }) {
   const [bikes, setBikes] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
+    Promise.resolve().then(() => { setLoading(true); setError(''); });
     fetch('/api/bikes', { cache: 'no-store' })
       .then(async (response) => {
         const data = await response.json();

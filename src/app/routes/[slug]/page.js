@@ -1,10 +1,9 @@
 'use client';
-import { use, useState, useCallback, useRef, useEffect } from 'react';
-import { notFound } from 'next/navigation';
+import { use, useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useI18n } from '@/lib/i18n';
-import { cyclingRoutes, generateGPX } from '@/lib/routes-data';
+import { generateGPX } from '@/lib/routes-data';
 import { 
   ChevronLeft, Download, Share2, MapPin, TrendingUp, TrendingDown, 
   Route, Mountain, Clock, Copy, Check, Mail,
@@ -37,6 +36,9 @@ const RouteMap = dynamic(() => import('@/components/RouteMap'), {
 });
 
 const difficultyColor = {
+  'Pemula': 'bg-green-100 text-green-700 border-green-200',
+  'Menengah': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  'Mahir': 'bg-red-100 text-red-700 border-red-200',
   'Mudah': 'bg-green-100 text-green-700 border-green-200',
   'Easy': 'bg-green-100 text-green-700 border-green-200',
   'Sedang': 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -65,18 +67,23 @@ export default function RouteDetailPage({ params }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [route, setRoute] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const slugParam = unwrappedParams.slug;
-  const route = cyclingRoutes.find(r => r.slug === slugParam);
-
-  if (!route) {
-    notFound();
-  }
+  useEffect(() => {
+    fetch(`/api/routes?slug=${encodeURIComponent(slugParam)}`, { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Rute tidak ditemukan.')))
+      .then(setRoute)
+      .catch(() => setRoute(null))
+      .finally(() => setLoading(false));
+  }, [slugParam]);
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
-  const shareTitle = `${route.name[locale]} — Kulino Pit Cycling Routes`;
+  const shareTitle = `${route?.name?.[locale] || 'Kulino Pit'} — Kulino Pit Cycling Routes`;
 
   const handleDownloadGPX = useCallback(() => {
+    if (!route) return;
     const gpxContent = generateGPX(route);
     const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
     const url = URL.createObjectURL(blob);
@@ -116,6 +123,9 @@ export default function RouteDetailPage({ params }) {
       setShowShareModal(true);
     }
   }, [shareTitle, shareUrl]);
+
+  if (loading) return <div className="min-h-screen bg-gray-50 pt-32 text-center text-sm text-gray-500">Memuat rute…</div>;
+  if (!route) return <div className="min-h-screen bg-gray-50 px-4 pt-32 text-center"><h1 className="font-display text-3xl font-black">Rute tidak ditemukan</h1><Link href="/routes" className="mt-5 inline-flex rounded-xl bg-blue-500 px-5 py-3 font-bold text-white">Kembali ke daftar rute</Link></div>;
 
   const maxElev = Math.max(...route.elevationProfile.map(p => p.elev));
   const minElev = Math.min(...route.elevationProfile.map(p => p.elev));

@@ -1,10 +1,13 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useI18n } from '@/lib/i18n';
-import { cyclingRoutes } from '@/lib/routes-data';
-import { MapPin, Mountain, ArrowUpRight, Download, Route, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowUpRight, Download, Route, TrendingUp, TrendingDown } from 'lucide-react';
 
 const difficultyColor = {
+  'Pemula': 'bg-green-100 text-green-700 border-green-200',
+  'Menengah': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  'Mahir': 'bg-red-100 text-red-700 border-red-200',
   'Mudah': 'bg-green-100 text-green-700 border-green-200',
   'Easy': 'bg-green-100 text-green-700 border-green-200',
   'Sedang': 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -15,6 +18,11 @@ const difficultyColor = {
 
 export default function RoutesPage() {
   const { t, locale } = useI18n();
+  const [cyclingRoutes, setCyclingRoutes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    fetch('/api/routes', { cache: 'no-store' }).then((response) => response.ok ? response.json() : []).then(setCyclingRoutes).catch(() => setCyclingRoutes([])).finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="pt-24 pb-20 bg-gray-50 min-h-screen">
@@ -35,6 +43,8 @@ export default function RoutesPage() {
 
         {/* Routes Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {loading && <div className="md:col-span-2 lg:col-span-3 rounded-3xl border bg-white p-12 text-center text-sm text-gray-500">Memuat rute…</div>}
+          {!loading && cyclingRoutes.length === 0 && <div className="md:col-span-2 lg:col-span-3 rounded-3xl border border-dashed bg-white p-12 text-center text-sm text-gray-500">Belum ada rute aktif.</div>}
           {cyclingRoutes.map(route => (
             <Link 
               key={route.id} 
@@ -80,6 +90,7 @@ export default function RoutesPage() {
                   {/* Start marker */}
                   {(() => {
                     const c = route.coordinates[0];
+                    if (!c) return null;
                     const minLat = Math.min(...route.coordinates.map(p => p[0]));
                     const maxLat = Math.max(...route.coordinates.map(p => p[0]));
                     const minLng = Math.min(...route.coordinates.map(p => p[1]));

@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
-import { bikes, tours, formatCurrency, getLowestPrice } from '@/lib/data';
+import { formatCurrency, getLowestPrice } from '@/lib/data';
 import { memberRewards, normalizeMemberProfile } from '@/lib/member-profile';
+import { syncMemberProfile } from '@/lib/member-sync';
 import PWAInstallBanner from '@/components/PWAInstallBanner';
 import CyclingWeatherCard from '@/components/CyclingWeatherCard';
 import InAppBookingModal from '@/components/InAppBookingModal';
@@ -178,7 +179,7 @@ function DigitalMemberCard({ user, onShowQR }) {
 }
 
 /* ─── Dashboard Overview Tab (Harmonious Theme & In-App Booking) ─── */
-function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBikeCatalog, history, member }) {
+function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBikeCatalog, history, member, bikes, tours, catalogLoading, catalogError }) {
   const d = member;
   const [showQRModal, setShowQRModal] = useState(false);
 
@@ -416,10 +417,11 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
                 </p>
                 <button
                   onClick={() => {
-                    const targetBike = bikes.find(b => b.id === promo.bikeId) || bikes[0];
-                    onStartBooking(targetBike);
+                    const targetBike = bikes[promo.id - 1] || bikes[0];
+                    if (targetBike?.available) onStartBooking(targetBike);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-white text-stone-900 text-[10px] font-black hover:bg-gray-100 transition-colors shadow-sm shrink-0 cursor-pointer"
+                  disabled={!bikes.length}
+                  className="px-3 py-1.5 rounded-xl bg-white text-stone-900 text-[10px] font-black hover:bg-gray-100 transition-colors shadow-sm shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Klaim
                 </button>
@@ -444,14 +446,17 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
           </button>
         </div>
 
+        {catalogLoading && <div className="rounded-2xl border border-gray-100 bg-white px-5 py-10 text-center text-xs font-semibold text-gray-400">Memuat armada dari database…</div>}
+        {!catalogLoading && catalogError && <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-center text-xs font-semibold text-red-600">{catalogError}</div>}
+        {!catalogLoading && !catalogError && bikes.length === 0 && <div className="rounded-2xl border border-gray-100 bg-white px-5 py-10 text-center text-xs font-semibold text-gray-400">Belum ada armada yang ditayangkan Admin.</div>}
         <div className="flex overflow-x-auto gap-3.5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
           {bikes.slice(0, 6).map((bike) => {
             const minPrice = getLowestPrice(bike);
             return (
               <div
                 key={bike.id}
-                onClick={() => onStartBooking(bike)}
-                className="flex-shrink-0 w-[260px] sm:w-[270px] bg-white rounded-[24px] p-3.5 shadow-sm border border-gray-100 hover:border-sky-300 hover:shadow-md transition-all group snap-center flex flex-col justify-between cursor-pointer"
+                onClick={() => bike.available && onStartBooking(bike)}
+                className={`flex-shrink-0 w-[260px] sm:w-[270px] bg-white rounded-[24px] p-3.5 shadow-sm border border-gray-100 transition-all group snap-center flex flex-col justify-between ${bike.available ? 'hover:border-sky-300 hover:shadow-md cursor-pointer' : 'opacity-70 cursor-not-allowed'}`}
               >
                 <div>
                   <div className="relative h-32 w-full rounded-2xl overflow-hidden bg-gray-50 mb-3 flex items-center justify-center p-2">
@@ -464,6 +469,9 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
                     />
                     <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-white/90 backdrop-blur-sm text-[9px] font-bold text-[var(--color-primary)] uppercase shadow-xs">
                       {bike.category}
+                    </span>
+                    <span className={`absolute bottom-2 right-2 rounded-md px-2 py-0.5 text-[9px] font-black ${bike.available ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                      {bike.available ? `${bike.availableStock} tersedia` : 'Stok habis'}
                     </span>
                   </div>
 
@@ -485,11 +493,12 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onStartBooking(bike);
+                      if (bike.available) onStartBooking(bike);
                     }}
-                    className="btn btn-primary px-3.5 py-1.5 text-xs font-bold shadow-xs cursor-pointer"
+                    disabled={!bike.available}
+                    className="btn btn-primary px-3.5 py-1.5 text-xs font-bold shadow-xs cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Sewa
+                    {bike.available ? 'Sewa' : 'Habis'}
                   </button>
                 </div>
               </div>
@@ -513,12 +522,9 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
 
           <div className="flex overflow-x-auto gap-3.5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
             {tours.map((tour) => (
-              <div
+              <Link
                 key={tour.id}
-                onClick={() => {
-                  const matchedBike = bikes[0];
-                  onStartBooking(matchedBike);
-                }}
+                href={`/trip-tour/${tour.slug}`}
                 className="flex-shrink-0 w-[260px] bg-white rounded-[24px] overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all group snap-center cursor-pointer"
               >
                 <div className="relative h-28 w-full">
@@ -545,7 +551,7 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
                     {formatCurrency(tour.price)}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -652,7 +658,7 @@ function RideTrackerTab({ t, locale }) {
 
   const [location, setLocation] = useState({ lat: -8.2192, lng: 114.3692 });
   const [speed, setSpeed] = useState(0);
-  const [gpsStatus, setGpsStatus] = useState('MENUNGGU SINYAL GPS');
+  const [gpsStatus, setGpsStatus] = useState(() => typeof navigator !== 'undefined' && 'geolocation' in navigator ? 'MENDETEKSI LOKASI ANDA...' : 'GPS TIDAK TERSEDIA');
   const watchIdRef = useRef(null);
   const timerRef = useRef(null);
   const lastCoordsRef = useRef(null);
@@ -732,7 +738,6 @@ function RideTrackerTab({ t, locale }) {
   // ── Ambil lokasi real user saat komponen mount ──
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-      setGpsStatus('MENDETEKSI LOKASI ANDA...');
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const { latitude, longitude } = pos.coords;
@@ -1302,24 +1307,24 @@ function RuteGowesTab({ t, locale }) {
   const simCheckpointIdxRef = useRef(0);
   const simProgressRef = useRef(0);
 
-  // Default cycling routes (admin can manage these via /admin/routes)
   const [cyclingRoutes, setCyclingRoutes] = useState([]);
 
   useEffect(() => {
-    // Load admin-created routes from localStorage
-    const stored = localStorage.getItem('kulinoPitRoutes');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCyclingRoutes(parsed.filter(r => r.active !== false));
-          return;
-        }
-      } catch (e) { /* use defaults */ }
-    }
-    // Default curated routes for Banyuwangi
-    setCyclingRoutes(DEFAULT_CYCLING_ROUTES);
-  }, []);
+    let cancelled = false;
+    fetch('/api/routes', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : [])
+      .then((items) => {
+        if (cancelled) return;
+        setCyclingRoutes(items.map((route) => ({
+          ...route,
+          name: route.name?.[locale] || route.name?.id || route.name || '',
+          description: route.description?.[locale] || route.description?.id || route.description || '',
+          difficulty: route.difficulty?.[locale] || route.difficulty?.id || route.difficulty || 'Pemula',
+        })));
+      })
+      .catch(() => { if (!cancelled) setCyclingRoutes([]); });
+    return () => { cancelled = true; };
+  }, [locale]);
 
   const startRouteSimulation = (route) => {
     const cps = route?.checkpoints;
@@ -1745,63 +1750,6 @@ function RuteGowesTab({ t, locale }) {
     </div>
   );
 }
-
-// Default Cycling Routes for Banyuwangi
-const DEFAULT_CYCLING_ROUTES = [
-  {
-    id: 'route-1',
-    name: 'Rute Sunrise Pantai Boom',
-    description: 'Rute santai menikmati sunrise di sepanjang Pantai Boom Marina. Cocok untuk pemula dan keluarga dengan pemandangan laut yang memukau.',
-    color: '#10B981',
-    difficulty: 'Pemula',
-    distance_km: 5.2,
-    duration_min: 30,
-    elevation_m: 15,
-    active: true,
-    checkpoints: [
-      { id: 'cp1-1', name: 'Start: Kulino House', description: 'Titik kumpul dan briefing awal', lat: -8.2192, lng: 114.3692 },
-      { id: 'cp1-2', name: 'Taman Blambangan', description: 'Alun-alun ikonik Banyuwangi', lat: -8.2198, lng: 114.3548 },
-      { id: 'cp1-3', name: 'Dermaga Pantai Boom', description: 'Spot sunrise terbaik', lat: -8.2046, lng: 114.3855 },
-      { id: 'cp1-4', name: 'Finish: Marina Bay', description: 'Checkpoint akhir dan foto bersama', lat: -8.2063, lng: 114.3873 },
-    ],
-  },
-  {
-    id: 'route-2',
-    name: 'Rute Kota Heritage Banyuwangi',
-    description: 'Susuri bangunan-bangunan bersejarah kota Banyuwangi, melewati pecinan, masjid agung, dan kawasan kuliner legendaris.',
-    color: '#3B82F6',
-    difficulty: 'Menengah',
-    distance_km: 8.7,
-    duration_min: 50,
-    elevation_m: 35,
-    active: true,
-    checkpoints: [
-      { id: 'cp2-1', name: 'Start: Kulino House', description: 'Titik kumpul utama', lat: -8.2192, lng: 114.3692 },
-      { id: 'cp2-2', name: 'Masjid Agung Baiturrahman', description: 'Landmark spiritual kota Banyuwangi', lat: -8.2185, lng: 114.3530 },
-      { id: 'cp2-3', name: 'Kampung Pecinan', description: 'Kawasan etnis Tionghoa bersejarah', lat: -8.2165, lng: 114.3505 },
-      { id: 'cp2-4', name: 'Stasiun Banyuwangi Baru', description: 'Stasiun kereta terujung timur Jawa', lat: -8.2248, lng: 114.3500 },
-      { id: 'cp2-5', name: 'Finish: Kuliner Osing', description: 'Pasar kuliner dan checkpoint akhir', lat: -8.2210, lng: 114.3622 },
-    ],
-  },
-  {
-    id: 'route-3',
-    name: 'Rute Ijen Foothills Challenge',
-    description: 'Tantangan tanjakan menuju kaki Gunung Ijen. Hanya untuk pesepeda berpengalaman. Pemandangan perkebunan kopi dan hutan tropis.',
-    color: '#F59E0B',
-    difficulty: 'Mahir',
-    distance_km: 18.5,
-    duration_min: 120,
-    elevation_m: 450,
-    active: true,
-    checkpoints: [
-      { id: 'cp3-1', name: 'Start: Kulino House', description: 'Briefing khusus rute mahir', lat: -8.2192, lng: 114.3692 },
-      { id: 'cp3-2', name: 'Gapura Licin', description: 'Pintu masuk kawasan pegunungan', lat: -8.1550, lng: 114.2510 },
-      { id: 'cp3-3', name: 'Perkebunan Kopi Kayumas', description: 'Rest area dan foto di kebun kopi arabika', lat: -8.1205, lng: 114.2380 },
-      { id: 'cp3-4', name: 'Pos Paltuding', description: 'Pos terakhir sebelum jalur pendakian Ijen', lat: -8.0650, lng: 114.2420 },
-      { id: 'cp3-5', name: 'Finish: Warung Puncak', description: 'Istirahat dan checkpoint akhir', lat: -8.0820, lng: 114.2400 },
-    ],
-  },
-];
 
 function getRewardIcon(reward) {
   switch (reward.id) {
@@ -2350,15 +2298,32 @@ export default function MemberPage() {
   const [bookingDraft, setBookingDraft] = useState(null);
   const [showBikeCatalogModal, setShowBikeCatalogModal] = useState(false);
   const [history, setHistory] = useState([]);
+  const [catalogBikes, setCatalogBikes] = useState([]);
+  const [catalogTours, setCatalogTours] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
+
+  const refreshMemberData = useCallback(async () => {
+    const response = await fetch('/api/members/dashboard', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Data dashboard member gagal dimuat.');
+    setMemberProfile((current) => {
+      const updated = { ...(current || {}), ...data.member };
+      localStorage.setItem('memberProfile', JSON.stringify(updated));
+      return updated;
+    });
+    setHistory(Array.isArray(data.bookings) ? data.bookings : []);
+    return data;
+  }, []);
 
   useEffect(() => {
-    // Check member authentication
-    const auth = localStorage.getItem('isMember');
-    if (!auth) {
-      router.push('/login');
-    } else {
-      setIsAuthenticated(true);
-      // Load saved member profile (from registration/login)
+    let cancelled = false;
+    const initialize = async () => {
+      const auth = localStorage.getItem('isMember');
+      if (!auth) {
+        router.push('/login');
+        return;
+      }
       const savedProfile = localStorage.getItem('memberProfile');
       let parsedProfile = {};
       if (savedProfile) {
@@ -2367,60 +2332,66 @@ export default function MemberPage() {
         } catch (e) { /* use defaults */ }
       }
 
-      // Remove the old demo points once. They were never tied to the signed-in user.
-      if (!localStorage.getItem('memberDemoCleanupV1')) {
-        localStorage.removeItem('memberPoints');
-        localStorage.setItem('memberDemoCleanupV1', 'done');
+      if (!parsedProfile.name || String(parsedProfile.wa || parsedProfile.phone || '').replace(/\D/g, '').length < 9) {
+        localStorage.removeItem('isMember');
+        localStorage.removeItem('memberProfile');
+        localStorage.removeItem('memberBookings');
+        router.push('/login');
+        return;
       }
+      setIsAuthenticated(true);
+      localStorage.removeItem('memberBookings');
+      localStorage.removeItem('memberPoints');
+      setMemberProfile(normalizeMemberProfile(parsedProfile, [], parsedProfile.points || 0));
 
-      let savedHistory = [];
-      const saved = localStorage.getItem('memberBookings');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) savedHistory = parsed;
-        } catch (e) { /* ignore invalid local data */ }
-      }
-      setHistory(savedHistory);
-      const points = Number(localStorage.getItem('memberPoints') || parsedProfile.points || 0);
-      const normalizedProfile = normalizeMemberProfile(parsedProfile, savedHistory, points);
-      setMemberProfile(normalizedProfile);
-      localStorage.setItem('memberProfile', JSON.stringify(normalizedProfile));
-    }
-    setIsChecking(false);
+      try {
+        const syncedProfile = await syncMemberProfile(parsedProfile, { required: true });
+        if (cancelled) return;
+        localStorage.setItem('memberProfile', JSON.stringify(syncedProfile));
+        const [bikeResponse, tourResponse] = await Promise.all([
+          fetch('/api/bikes', { cache: 'no-store' }),
+          fetch('/api/tours', { cache: 'no-store' }),
+        ]);
+        const [bikeData, tourData] = await Promise.all([bikeResponse.json(), tourResponse.json()]);
+        if (!bikeResponse.ok) throw new Error(bikeData.error || 'Armada gagal dimuat.');
+        if (!tourResponse.ok) throw new Error(tourData.error || 'Tour gagal dimuat.');
+        if (cancelled) return;
+        setCatalogBikes(Array.isArray(bikeData) ? bikeData : []);
+        setCatalogTours(Array.isArray(tourData) ? tourData : []);
+        await refreshMemberData();
 
-    // Auto-open booking modal from URL ?bookBike=<id> (landing page → member PWA flow)
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const bookBikeId = params.get('bookBike');
-      if (bookBikeId) {
-        let savedDraft = null;
-        try { savedDraft = JSON.parse(sessionStorage.getItem('kulinoBookingDraft') || 'null'); } catch { savedDraft = null; }
-        setBookingDraft(savedDraft);
-        fetch('/api/bikes', { cache: 'no-store' })
-          .then((response) => response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`)))
-          .then((list) => {
-            const targetBike = list.find((bike) => String(bike.id) === String(bookBikeId));
-            if (targetBike?.available) setSelectedBookingBike(targetBike);
-          })
-          .catch(() => {
-            const targetBike = bikes.find(b => String(b.id) === String(bookBikeId));
-            if (targetBike) setSelectedBookingBike(targetBike);
-          });
-        // Clean the URL without reload
-        window.history.replaceState({}, '', '/member');
+        // Auto-open booking dari Landing Page setelah katalog database selesai dimuat.
+        const params = new URLSearchParams(window.location.search);
+        const bookBikeId = params.get('bookBike');
+        if (bookBikeId) {
+          let savedDraft = null;
+          try { savedDraft = JSON.parse(sessionStorage.getItem('kulinoBookingDraft') || 'null'); } catch { savedDraft = null; }
+          setBookingDraft(savedDraft);
+          const targetBike = bikeData.find((bike) => String(bike.id) === String(bookBikeId));
+          if (targetBike?.available) setSelectedBookingBike(targetBike);
+          window.history.replaceState({}, '', '/member');
+        }
+      } catch (requestError) {
+        if (!cancelled) setCatalogError(requestError.message);
+      } finally {
+        if (!cancelled) { setCatalogLoading(false); setIsChecking(false); }
       }
-    }
-  }, [router]);
+    };
+    initialize();
+    return () => { cancelled = true; };
+  }, [refreshMemberData, router]);
 
   const handleLogout = () => {
+    fetch('/api/members/session', { method: 'DELETE' }).catch(() => {});
     localStorage.removeItem('isMember');
     localStorage.removeItem('memberProfile');
+    localStorage.removeItem('memberBookings');
     router.push('/login');
   };
 
   const handleBookingSuccess = (newBooking) => {
     setHistory(prev => [newBooking, ...prev]);
+    refreshMemberData().catch(() => {});
   };
 
   const handlePointsChange = useCallback((points) => {
@@ -2557,6 +2528,10 @@ export default function MemberPage() {
               onOpenBikeCatalog={() => setShowBikeCatalogModal(true)}
               history={history}
               member={member}
+              bikes={catalogBikes}
+              tours={catalogTours}
+              catalogLoading={catalogLoading}
+              catalogError={catalogError}
             />
           )}
           {activeTab === 'tracker' && (
