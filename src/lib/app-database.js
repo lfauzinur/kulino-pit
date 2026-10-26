@@ -422,18 +422,6 @@ export function ensureAppDatabase() {
         )
       `;
 
-      await sql`
-        INSERT INTO promo_banners (kind, badge_id, badge_en, title_id, title_en, description_id, description_en, cta_label_id, cta_label_en, cta_url, background_color, text_color, image_url, sort_order)
-        SELECT seed.* FROM (VALUES
-          ('program', 'PROGRAM KELUARGA', 'FAMILY PROGRAM', 'Gowes seru bersama keluarga.', 'A fun ride with your family.', 'Paket sepeda, helm, dan rute pilihan untuk momen keluarga.', 'Bike, helmet, and curated routes for family moments.', 'Lihat Paket', 'View Package', '/booking/family', '#F5E8D4', '#172033', '/images/family_rent.png', 10),
-          ('promo', 'PROMO KULINO PIT', 'KULINO PIT PROMO', 'Mulai gowes dari Banyuwangi.', 'Start riding from Banyuwangi.', 'Pilih unit favorit dan pesan langsung dari Dashboard Member.', 'Choose your favorite bike and book from the Member Dashboard.', 'Mulai Gowes', 'Start Riding', '/unit-sepeda', '#FF7A00', '#FFFFFF', '/images/mascot-wave.png', 20),
-          ('program', 'CORPORATE RIDE', 'CORPORATE RIDE', 'Bangun kekompakan tim di atas sepeda.', 'Build team spirit on two wheels.', 'Program gowes untuk komunitas, perusahaan, dan event.', 'Cycling programs for communities, companies, and events.', 'Minta Penawaran', 'Get a Quote', '/booking/corporate', '#2693D8', '#FFFFFF', '/images/corporate_rent.png', 30)
-        ) AS seed(kind, badge_id, badge_en, title_id, title_en, description_id, description_en, cta_label_id, cta_label_en, cta_url, background_color, text_color, image_url, sort_order)
-        WHERE NOT EXISTS (
-          SELECT 1 FROM promo_banners WHERE LOWER(promo_banners.title_id) = LOWER(seed.title_id)
-        )
-      `;
-
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_member_id_idx ON bookings (member_id, created_at DESC)`;
@@ -452,7 +440,19 @@ export function ensureAppDatabase() {
       await sql`CREATE INDEX IF NOT EXISTS content_cards_sort_idx ON content_cards (section_key, published, sort_order, id)`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS rental_packages_type_name_idx ON rental_packages (package_type, LOWER(name))`;
       await sql`CREATE INDEX IF NOT EXISTS rental_packages_sort_idx ON rental_packages (package_type, published, sort_order, id)`;
+      // Serverless requests may initialize the schema concurrently. Remove any
+      // rows created by an earlier race, then install the unique index before
+      // seeding so all later inserts are protected by ON CONFLICT.
+      await sql`DELETE FROM promo_banners a USING promo_banners b WHERE LOWER(a.title_id) = LOWER(b.title_id) AND a.id > b.id`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS promo_banners_title_idx ON promo_banners (LOWER(title_id))`;
+      await sql`
+        INSERT INTO promo_banners (kind, badge_id, badge_en, title_id, title_en, description_id, description_en, cta_label_id, cta_label_en, cta_url, background_color, text_color, image_url, sort_order)
+        VALUES
+          ('program', 'PROGRAM KELUARGA', 'FAMILY PROGRAM', 'Gowes seru bersama keluarga.', 'A fun ride with your family.', 'Paket sepeda, helm, dan rute pilihan untuk momen keluarga.', 'Bike, helmet, and curated routes for family moments.', 'Lihat Paket', 'View Package', '/booking/family', '#F5E8D4', '#172033', '/images/family_rent.png', 10),
+          ('promo', 'PROMO KULINO PIT', 'KULINO PIT PROMO', 'Mulai gowes dari Banyuwangi.', 'Start riding from Banyuwangi.', 'Pilih unit favorit dan pesan langsung dari Dashboard Member.', 'Choose your favorite bike and book from the Member Dashboard.', 'Mulai Gowes', 'Start Riding', '/unit-sepeda', '#FF7A00', '#FFFFFF', '/images/mascot-wave.png', 20),
+          ('program', 'CORPORATE RIDE', 'CORPORATE RIDE', 'Bangun kekompakan tim di atas sepeda.', 'Build team spirit on two wheels.', 'Program gowes untuk komunitas, perusahaan, dan event.', 'Cycling programs for communities, companies, and events.', 'Minta Penawaran', 'Get a Quote', '/booking/corporate', '#2693D8', '#FFFFFF', '/images/corporate_rent.png', 30)
+        ON CONFLICT (LOWER(title_id)) DO NOTHING
+      `;
       await sql`CREATE INDEX IF NOT EXISTS promo_banners_sort_idx ON promo_banners (published, sort_order, id)`;
       await sql`CREATE INDEX IF NOT EXISTS footer_items_sort_idx ON footer_items (group_key, published, sort_order, id)`;
     })().catch((error) => {
