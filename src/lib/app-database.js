@@ -448,10 +448,22 @@ export function ensureAppDatabase() {
       await sql`
         INSERT INTO promo_banners (kind, badge_id, badge_en, title_id, title_en, description_id, description_en, cta_label_id, cta_label_en, cta_url, background_color, text_color, image_url, sort_order)
         VALUES
-          ('program', 'PROGRAM KELUARGA', 'FAMILY PROGRAM', 'Gowes seru bersama keluarga.', 'A fun ride with your family.', 'Paket sepeda, helm, dan rute pilihan untuk momen keluarga.', 'Bike, helmet, and curated routes for family moments.', 'Lihat Paket', 'View Package', '/booking/family', '#F5E8D4', '#172033', '/images/family_rent.png', 10),
+          ('program', 'PROGRAM KELUARGA', 'FAMILY PROGRAM', 'Gowes seru bersama keluarga.', 'A fun ride with your family.', 'Paket sepeda, helm, dan rute pilihan untuk momen keluarga.', 'Bike, helmet, and curated routes for family moments.', 'Lihat Paket', 'View Package', '/booking/family', '#F5E8D4', '#172033', '/images/family-kulino-mascots.png', 10),
           ('promo', 'PROMO KULINO PIT', 'KULINO PIT PROMO', 'Mulai gowes dari Banyuwangi.', 'Start riding from Banyuwangi.', 'Pilih unit favorit dan pesan langsung dari Dashboard Member.', 'Choose your favorite bike and book from the Member Dashboard.', 'Mulai Gowes', 'Start Riding', '/unit-sepeda', '#FF7A00', '#FFFFFF', '/images/mascot-wave.png', 20),
-          ('program', 'CORPORATE RIDE', 'CORPORATE RIDE', 'Bangun kekompakan tim di atas sepeda.', 'Build team spirit on two wheels.', 'Program gowes untuk komunitas, perusahaan, dan event.', 'Cycling programs for communities, companies, and events.', 'Minta Penawaran', 'Get a Quote', '/booking/corporate', '#2693D8', '#FFFFFF', '/images/corporate_rent.png', 30)
+          ('program', 'CORPORATE RIDE', 'CORPORATE RIDE', 'Bangun kekompakan tim di atas sepeda.', 'Build team spirit on two wheels.', 'Program gowes untuk komunitas, perusahaan, dan event.', 'Cycling programs for communities, companies, and events.', 'Minta Penawaran', 'Get a Quote', '/booking/corporate', '#2693D8', '#FFFFFF', '/images/corporate-team-mascots.png', 30)
         ON CONFLICT (LOWER(title_id)) DO NOTHING
+      `;
+      await sql`
+        UPDATE promo_banners SET
+          image_url = CASE
+            WHEN LOWER(title_id) = LOWER('Gowes seru bersama keluarga.') THEN '/images/family-kulino-mascots.png'
+            WHEN LOWER(title_id) = LOWER('Bangun kekompakan tim di atas sepeda.') THEN '/images/corporate-team-mascots.png'
+            ELSE image_url
+          END,
+          updated_at = NOW()
+        WHERE
+          (LOWER(title_id) = LOWER('Gowes seru bersama keluarga.') AND image_url IN ('', '/images/family_rent.png'))
+          OR (LOWER(title_id) = LOWER('Bangun kekompakan tim di atas sepeda.') AND image_url IN ('', '/images/corporate_rent.png'))
       `;
       await sql`CREATE INDEX IF NOT EXISTS promo_banners_sort_idx ON promo_banners (published, sort_order, id)`;
       await sql`CREATE INDEX IF NOT EXISTS footer_items_sort_idx ON footer_items (group_key, published, sort_order, id)`;

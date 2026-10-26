@@ -102,7 +102,7 @@ function BannerCard({ banner, locale, compact = false, index = 0 }) {
       className={`relative isolate shrink-0 snap-center overflow-hidden border border-black/5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] ${compact ? 'h-[180px] w-[285px] rounded-[24px] p-5' : `min-h-[310px] rounded-[32px] p-7 sm:p-8 ${spanClass}`}`}
       style={{ backgroundColor: banner.backgroundColor, color: banner.textColor }}
     >
-      <div className={`relative z-10 flex h-full max-w-[70%] flex-col ${compact ? 'justify-between' : 'justify-start'}`}>
+      <div className={`relative z-10 flex h-full flex-col ${banner.imageUrl ? (compact ? 'max-w-[64%]' : 'max-w-[60%]') : 'max-w-full'} ${compact ? 'justify-between' : 'justify-start'}`}>
         <div>
           <p className={`${compact ? 'text-[9px]' : 'text-[10px]'} mb-3 font-black uppercase tracking-[0.2em] opacity-75`}>{badge || (banner.kind === 'program' ? 'PROGRAM' : 'PROMO')}</p>
           <h3 className={`font-display font-black leading-[1.08] ${compact ? 'text-xl' : 'text-3xl sm:text-[2.15rem]'}`}>{title}</h3>
@@ -111,7 +111,7 @@ function BannerCard({ banner, locale, compact = false, index = 0 }) {
         {cta && <div className={compact ? '' : 'mt-6'}><BannerAction href={banner.ctaUrl}>{cta}<ArrowRight size={13} /></BannerAction></div>}
       </div>
       {banner.imageUrl && (
-        <div className={`pointer-events-none absolute bottom-0 right-0 z-0 ${compact ? 'h-[84%] w-[45%]' : 'h-[72%] w-[52%]'}`}>
+        <div className={`pointer-events-none absolute bottom-0 right-0 z-0 ${compact ? 'h-[76%] w-[42%]' : 'h-[69%] w-[49%]'}`}>
           <Image src={banner.imageUrl} alt="" fill unoptimized sizes={compact ? '140px' : '(max-width: 1024px) 50vw, 360px'} className="object-contain object-right-bottom drop-shadow-2xl" />
         </div>
       )}
