@@ -294,6 +294,31 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`
+        CREATE TABLE IF NOT EXISTS promo_banners (
+          id BIGSERIAL PRIMARY KEY,
+          kind TEXT NOT NULL DEFAULT 'promo',
+          badge_id TEXT NOT NULL DEFAULT '',
+          badge_en TEXT NOT NULL DEFAULT '',
+          title_id TEXT NOT NULL,
+          title_en TEXT NOT NULL DEFAULT '',
+          description_id TEXT NOT NULL DEFAULT '',
+          description_en TEXT NOT NULL DEFAULT '',
+          cta_label_id TEXT NOT NULL DEFAULT '',
+          cta_label_en TEXT NOT NULL DEFAULT '',
+          cta_url TEXT NOT NULL DEFAULT '',
+          background_color TEXT NOT NULL DEFAULT '#2693D8',
+          text_color TEXT NOT NULL DEFAULT '#FFFFFF',
+          image_url TEXT NOT NULL DEFAULT '',
+          image_public_id TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          published BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          CONSTRAINT promo_banners_kind_check CHECK (kind IN ('promo', 'program'))
+        )
+      `;
+
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_categories_name_lower_idx ON tour_categories (LOWER(name))`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS tour_packages_name_lower_idx ON tour_packages (LOWER(name))`;
       await sql`INSERT INTO tour_categories (name) VALUES ('Group Tours'), ('Private Tours') ON CONFLICT DO NOTHING`;
@@ -397,6 +422,18 @@ export function ensureAppDatabase() {
         )
       `;
 
+      await sql`
+        INSERT INTO promo_banners (kind, badge_id, badge_en, title_id, title_en, description_id, description_en, cta_label_id, cta_label_en, cta_url, background_color, text_color, image_url, sort_order)
+        SELECT seed.* FROM (VALUES
+          ('program', 'PROGRAM KELUARGA', 'FAMILY PROGRAM', 'Gowes seru bersama keluarga.', 'A fun ride with your family.', 'Paket sepeda, helm, dan rute pilihan untuk momen keluarga.', 'Bike, helmet, and curated routes for family moments.', 'Lihat Paket', 'View Package', '/booking/family', '#F5E8D4', '#172033', '/images/family_rent.png', 10),
+          ('promo', 'PROMO KULINO PIT', 'KULINO PIT PROMO', 'Mulai gowes dari Banyuwangi.', 'Start riding from Banyuwangi.', 'Pilih unit favorit dan pesan langsung dari Dashboard Member.', 'Choose your favorite bike and book from the Member Dashboard.', 'Mulai Gowes', 'Start Riding', '/unit-sepeda', '#FF7A00', '#FFFFFF', '/images/mascot-wave.png', 20),
+          ('program', 'CORPORATE RIDE', 'CORPORATE RIDE', 'Bangun kekompakan tim di atas sepeda.', 'Build team spirit on two wheels.', 'Program gowes untuk komunitas, perusahaan, dan event.', 'Cycling programs for communities, companies, and events.', 'Minta Penawaran', 'Get a Quote', '/booking/corporate', '#2693D8', '#FFFFFF', '/images/corporate_rent.png', 30)
+        ) AS seed(kind, badge_id, badge_en, title_id, title_en, description_id, description_en, cta_label_id, cta_label_en, cta_url, background_color, text_color, image_url, sort_order)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM promo_banners WHERE LOWER(promo_banners.title_id) = LOWER(seed.title_id)
+        )
+      `;
+
       await sql`CREATE INDEX IF NOT EXISTS bookings_rental_date_idx ON bookings (rental_date)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_created_at_idx ON bookings (created_at DESC)`;
       await sql`CREATE INDEX IF NOT EXISTS bookings_member_id_idx ON bookings (member_id, created_at DESC)`;
@@ -415,6 +452,8 @@ export function ensureAppDatabase() {
       await sql`CREATE INDEX IF NOT EXISTS content_cards_sort_idx ON content_cards (section_key, published, sort_order, id)`;
       await sql`CREATE UNIQUE INDEX IF NOT EXISTS rental_packages_type_name_idx ON rental_packages (package_type, LOWER(name))`;
       await sql`CREATE INDEX IF NOT EXISTS rental_packages_sort_idx ON rental_packages (package_type, published, sort_order, id)`;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS promo_banners_title_idx ON promo_banners (LOWER(title_id))`;
+      await sql`CREATE INDEX IF NOT EXISTS promo_banners_sort_idx ON promo_banners (published, sort_order, id)`;
       await sql`CREATE INDEX IF NOT EXISTS footer_items_sort_idx ON footer_items (group_key, published, sort_order, id)`;
     })().catch((error) => {
       schemaPromise = undefined;
@@ -644,6 +683,24 @@ export function rentalPackageRow(row) {
     whatsappNumber: row.whatsapp_number || '',
     whatsappLabel: row.whatsapp_label || 'Pesan via WhatsApp',
     whatsappMessage: row.whatsapp_message || '',
+    sortOrder: Number(row.sort_order || 0),
+    published: Boolean(row.published),
+  };
+}
+
+export function promoBannerRow(row) {
+  return {
+    id: Number(row.id),
+    kind: row.kind || 'promo',
+    badge: { id: row.badge_id || '', en: row.badge_en || row.badge_id || '' },
+    title: { id: row.title_id, en: row.title_en || row.title_id },
+    description: { id: row.description_id || '', en: row.description_en || row.description_id || '' },
+    ctaLabel: { id: row.cta_label_id || '', en: row.cta_label_en || row.cta_label_id || '' },
+    ctaUrl: row.cta_url || '',
+    backgroundColor: row.background_color || '#2693D8',
+    textColor: row.text_color || '#FFFFFF',
+    imageUrl: row.image_url || '',
+    imagePublicId: row.image_public_id || '',
     sortOrder: Number(row.sort_order || 0),
     published: Boolean(row.published),
   };

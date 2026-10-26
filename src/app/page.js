@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { testimonials, formatCurrency, getLowestPrice } from '@/lib/data';
 import { MapPin, Calendar, Search, Map, CreditCard, Briefcase, Plus, Users, User, Star, Flame, Play, X, Images } from 'lucide-react';
 import VisitorTracker from '@/components/VisitorTracker';
+import PromoBannerStrip from '@/components/PromoBannerStrip';
 
 /* ─── Hero Section ─── */
 function HeroSection({ t, locale, heroBikeImage }) {
@@ -611,6 +612,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       <HeroSection t={t} locale={locale} heroBikeImage={heroBikeImage} />
+      <PromoBannerStrip locale={locale} />
       <AboutSection t={t} />
       <HowItWorks t={t} />
       <RentalOptions t={t} locale={locale} />

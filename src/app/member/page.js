@@ -12,6 +12,7 @@ import PWAInstallBanner from '@/components/PWAInstallBanner';
 import CyclingWeatherCard from '@/components/CyclingWeatherCard';
 import InAppBookingModal from '@/components/InAppBookingModal';
 import InAppBikeCatalogModal from '@/components/InAppBikeCatalogModal';
+import PromoBannerStrip from '@/components/PromoBannerStrip';
 
 const LiveRouteNavMap = dynamic(() => import('@/components/LiveRouteNavMap'), {
   ssr: false,
@@ -183,36 +184,6 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
   const d = member;
   const [showQRModal, setShowQRModal] = useState(false);
 
-  const promos = [
-    {
-      id: 1,
-      badge: 'PROMO SPESIAL',
-      title: 'DISKON 20%\nWEEKEND RIDE',
-      subtitle: 'Semua Road Bike & MTB',
-      desc: 'Berlaku setiap Sabtu & Minggu untuk booking minimal 4 jam.',
-      bg: 'bg-gradient-to-br from-blue-600 to-sky-700 text-white',
-      bikeId: 1,
-    },
-    {
-      id: 2,
-      badge: 'EKSKLUSIF MEMBER',
-      title: 'GRATIS 1 JAM\nSEWA SEPEDA',
-      subtitle: 'Klaim Poin Member',
-      desc: 'Tukarkan 100 poin member untuk 1 jam gowes gratis kapan saja.',
-      bg: 'bg-gradient-to-br from-sky-600 to-blue-800 text-white',
-      bikeId: 3,
-    },
-    {
-      id: 3,
-      badge: 'TOUR POPULER',
-      title: 'SUNRISE TRIP\nIJEN VIBES',
-      subtitle: 'Paket Tour Pagi',
-      desc: 'Termasuk Road Captain, helm premium, foto drone, dan snack.',
-      bg: 'bg-gradient-to-br from-slate-800 to-slate-900 text-white',
-      bikeId: 2,
-    },
-  ];
-
   /* Icon SENADA dengan UI Kulino Pit — Spin Wheel & Tukar Poin digabung jadi "Poin & Hadiah" */
   const quickFeatures = [
     { 
@@ -381,55 +352,7 @@ function DashboardOverview({ t, locale, setActiveTab, onStartBooking, onOpenBike
         </div>
       </div>
 
-      {/* PILIHAN HARI INI: Promo Spesial */}
-      <div>
-        <div className="flex justify-between items-end mb-3.5 px-1">
-          <div>
-            <p className="text-[var(--color-primary)] font-black text-[10px] tracking-widest uppercase mb-0.5">PILIHAN HARI INI</p>
-            <h2 className="font-display font-black text-lg text-gray-900">Promo & Voucher Eksklusif</h2>
-          </div>
-          <button onClick={() => setActiveTab('points')} className="text-xs font-bold text-[var(--color-primary)] hover:underline flex items-center gap-1 cursor-pointer">
-            Lihat Reward <ChevronRight size={13} />
-          </button>
-        </div>
-
-        <div className="flex overflow-x-auto gap-3.5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide snap-x">
-          {promos.map((promo) => (
-            <div
-              key={promo.id}
-              className={`flex-shrink-0 w-[280px] sm:w-[300px] h-[168px] rounded-[24px] ${promo.bg} p-5 relative overflow-hidden shadow-lg snap-center flex flex-col justify-between`}
-            >
-              <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl" />
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-[9px] font-black uppercase tracking-wider backdrop-blur-sm">
-                    {promo.badge}
-                  </span>
-                  <span className="text-[9px] text-white/80 font-bold uppercase">{promo.subtitle}</span>
-                </div>
-                <h3 className="text-white text-lg font-black leading-tight drop-shadow-sm whitespace-pre-line">
-                  {promo.title}
-                </h3>
-              </div>
-              <div className="flex justify-between items-end">
-                <p className="text-white/90 text-[10px] font-medium max-w-[170px] leading-tight">
-                  {promo.desc}
-                </p>
-                <button
-                  onClick={() => {
-                    const targetBike = bikes[promo.id - 1] || bikes[0];
-                    if (targetBike?.available) onStartBooking(targetBike);
-                  }}
-                  disabled={!bikes.length}
-                  className="px-3 py-1.5 rounded-xl bg-white text-stone-900 text-[10px] font-black hover:bg-gray-100 transition-colors shadow-sm shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Klaim
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <PromoBannerStrip locale={locale} compact />
 
       {/* Gambar 4 & 5: ARMADA SEPEDA SIAP GOWES — KLIK LANGSUNG KE DURASI SEWA (TETAP DI PWA MEMBER) */}
       <div>
