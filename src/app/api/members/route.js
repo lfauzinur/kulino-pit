@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ensureAppDatabase, sql } from '@/lib/app-database';
 import { createMemberSessionToken, MEMBER_SESSION_COOKIE, MEMBER_SESSION_MAX_AGE } from '@/lib/member-auth';
+import { sendEventNotifications } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -55,9 +56,15 @@ export async function POST(request) {
         photo_url = CASE WHEN EXCLUDED.photo_url <> '' THEN EXCLUDED.photo_url ELSE members.photo_url END,
         last_login_at = NOW(),
         updated_at = NOW()
-      RETURNING id, member_code, name, phone, email, address, provider, photo_url, created_at
+      RETURNING id, member_code, name, phone, email, address, provider, photo_url, created_at, (xmax = 0) AS is_new
     `;
     const member = rows[0];
+    if (member.is_new) {
+      await sendEventNotifications('customer', { member: {
+        memberCode: member.member_code, name: member.name, phone: member.phone, email: member.email,
+        address: member.address, provider: member.provider, registeredAt: member.created_at,
+      } }).catch((error) => console.error('Customer notification error:', error));
+    }
     const response = NextResponse.json({
       memberId: member.member_code,
       name: member.name,

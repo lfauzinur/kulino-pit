@@ -93,6 +93,36 @@ export function ensureAppDatabase() {
       await sql`ALTER TABLE partner_applications ADD COLUMN IF NOT EXISTS photo_public_id TEXT`;
 
       await sql`
+        CREATE TABLE IF NOT EXISTS notification_recipients (
+          id BIGSERIAL PRIMARY KEY,
+          channel TEXT NOT NULL CHECK (channel IN ('telegram', 'email')),
+          destination TEXT NOT NULL,
+          label TEXT NOT NULL DEFAULT '',
+          events JSONB NOT NULL DEFAULT '["booking", "customer", "partner"]'::jsonb,
+          enabled BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(channel, destination)
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS notification_deliveries (
+          id BIGSERIAL PRIMARY KEY,
+          recipient_id BIGINT REFERENCES notification_recipients(id) ON DELETE SET NULL,
+          event_type TEXT NOT NULL,
+          channel TEXT NOT NULL,
+          destination TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          provider_message_id TEXT DEFAULT '',
+          error TEXT DEFAULT '',
+          payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          sent_at TIMESTAMPTZ
+        )
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS notification_deliveries_created_at_idx ON notification_deliveries (created_at DESC)`;
+
+      await sql`
         CREATE TABLE IF NOT EXISTS articles (
           id BIGSERIAL PRIMARY KEY,
           slug TEXT NOT NULL UNIQUE,

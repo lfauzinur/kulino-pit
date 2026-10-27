@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { v2 as cloudinary } from 'cloudinary';
 import { requireAdminSession } from '@/lib/admin-auth';
 import { ensureAppDatabase, partnerRow, sql } from '@/lib/app-database';
+import { sendEventNotifications } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -94,7 +95,12 @@ export async function POST(request) {
         ${uploadedPhoto.url || String(body.photoUrl || '')}, ${uploadedPhoto.publicId}
       ) RETURNING *
     `;
-    return NextResponse.json(partnerRow(rows[0]), { status: 201, headers: noStore });
+    const partner = partnerRow(rows[0]);
+    await sendEventNotifications('partner', { partner: {
+      id: partner.id, name: partner.name, phone: partner.phone, email: partner.email,
+      city: partner.city, bikeName: partner.bike, category: partner.category, createdAt: partner.date,
+    } }).catch((error) => console.error('Partner notification error:', error));
+    return NextResponse.json(partner, { status: 201, headers: noStore });
   } catch (error) {
     console.error('POST /api/partners error:', error);
     if (uploadedPhoto?.publicId) {

@@ -3,6 +3,7 @@ import { requireAdminSession } from '@/lib/admin-auth';
 import { bookingRow, ensureAppDatabase, sql } from '@/lib/app-database';
 import { readPaymentMethods } from '@/lib/payment-methods';
 import { getMemberSession } from '@/lib/member-auth';
+import { sendEventNotifications } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store, max-age=0' };
@@ -105,7 +106,9 @@ export async function POST(request) {
       ) RETURNING *
     `;
 
-    return NextResponse.json({ ...bookingRow(rows[0]), paymentMethodDetails: selectedPaymentMethod }, { status: 201 });
+    const booking = bookingRow(rows[0]);
+    await sendEventNotifications('booking', { booking }).catch((error) => console.error('Booking notification error:', error));
+    return NextResponse.json({ ...booking, paymentMethodDetails: selectedPaymentMethod }, { status: 201 });
   } catch (error) {
     console.error('POST /api/bookings error:', error);
     return NextResponse.json({ error: 'Booking gagal disimpan.' }, { status: 500 });

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { I18nProvider } from '@/lib/i18n';
-import { LayoutDashboard, CalendarDays, Bike, Users, UserRound, FileText, LogOut, ShieldAlert, RotateCcw, Map, BarChart3, Navigation2, Menu, X, BriefcaseBusiness, Images, PanelsTopLeft, CreditCard, PanelBottom, PackageOpen, Megaphone } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Bike, Users, UserRound, FileText, LogOut, ShieldAlert, RotateCcw, Map, BarChart3, Navigation2, Menu, X, BriefcaseBusiness, Images, PanelsTopLeft, CreditCard, PanelBottom, PackageOpen, Megaphone, BellRing } from 'lucide-react';
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
@@ -65,6 +65,7 @@ export default function AdminLayout({ children }) {
     { href: '/admin/customers', label: 'Customer', icon: <UserRound size={20} /> },
     { href: '/admin/banners', label: 'Program & Promo', icon: <Megaphone size={20} /> },
     { href: '/admin/payments', label: 'Pembayaran', icon: <CreditCard size={20} /> },
+    { href: '/admin/notifications', label: 'Notifikasi', icon: <BellRing size={20} /> },
     { href: '/admin/fleet', label: 'Fleet & Bikes', icon: <Bike size={20} /> },
     { href: '/admin/partners', label: 'Partners', icon: <Users size={20} /> },
     { href: '/admin/articles', label: 'Articles', icon: <FileText size={20} /> },
